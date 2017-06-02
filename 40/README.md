@@ -15,7 +15,7 @@ git config --global core.quotepath false
 
 # win macosx 大小写不敏感
 # linux大小写文件名,在win上是同一个,所以从linux克隆后要设置
-git config core.ignorecase true		#克隆自动会添加
+git config core.ignorecase true     #克隆自动会添加
 #设置之后不能直接改大小写,要先改成其他名字再改回来
 
 
@@ -31,9 +31,7 @@ CRLF \r\n #win
 #svn 前1024或15%非ASCII字符,中文会误判
 #git 前8000字有NULL是二进制, 及显示转换 后缀名
 .gitattributes #配置
-# * text=auto
-# *.vcproj eol-crlf
-# *.sh eol=lf
+# * text=auto # *.vcproj eol-crlf # *.sh eol=lf
 
 git config --global core.autocrlf true
 #忽略core.eol始终使用CRLF,适合win,但使用编辑器可以不考虑
@@ -43,7 +41,3 @@ git config --global core.autocrlf input
 #异常捕获
 core.safecrlf #不可逆转换前警告或拒绝
 git config --global core.safecrlf warn
-
- 
-
-
