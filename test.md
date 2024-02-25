@@ -50,17 +50,17 @@ git config --global core.safecrlf warn
 
 [user]
         email = tmp4321@qq.com
-        name = yann
-[alias]
+        name = yann  
+[alias]  
         st = status
         lg = log --color --graph --pretty=format:'%Cred%h%Creset -%C(yellow)%d%Creset %s %Cgreen(%cr) %C(bold blue)<%an>%Creset' --abbrev-commit
         ci = commit -m
         co = checkout
         br = branch
 
-[core]
+[core]  
         quotepath = false
         safecrlf = false
         autocrlf = false
-        safecrlf=warn
-
+        safecrlf=warn  
+        
