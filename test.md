@@ -3,19 +3,19 @@
 git config --global core.quotepath false
 #正确显示文件名
 
-# git config --system core.quotepath false
-# git config --i18n.commitEncoding gbk
-# git config --i18n.logOutputEncoding gbk
-# #gbk
-# git cat-file -p HEAD | iconv -f gbk -t utf8
+#git config --system core.quotepath false
+#git config --i18n.commitEncoding gbk
+#git config --i18n.logOutputEncoding gbk
+##gbk
+#git cat-file -p HEAD | iconv -f gbk -t utf8
 
-# 对于非utf8字符集平台 如msysGit,1.74版支持不完善,以本地字符集保存
-# 直接在Linux平台检出会显示乱码
-# git cat-file -p HEAD^{tree} | iconv -f gbk -t utf8
+#对于非utf8字符集平台 如msysGit,1.74版支持不完善,以本地字符集保存
+#直接在Linux平台检出会显示乱码
+#git cat-file -p HEAD^{tree} | iconv -f gbk -t utf8
 
-# win macosx 大小写不敏感
-# linux大小写文件名,在win上是同一个,所以从linux克隆后要设置
-git config core.ignorecase true		#克隆自动会添加
+#win macosx 大小写不敏感
+#linux大小写文件名,在win上是同一个,所以从linux克隆后要设置
+git config core.ignorecase true     #克隆自动会添加
 #设置之后不能直接改大小写,要先改成其他名字再改回来
 
 
@@ -31,7 +31,7 @@ CRLF \r\n #win
 #svn 前1024或15%非ASCII字符,中文会误判
 #git 前8000字有NULL是二进制, 及显示转换 后缀名
 .gitattributes #配置
-# * text=auto # *.vcproj eol-crlf # *.sh eol=lf
+#* text=auto #*.vcproj eol-crlf #*.sh eol=lf
 
 git config --global core.autocrlf true
 #忽略core.eol始终使用CRLF,适合win,但使用编辑器可以不考虑
@@ -44,4 +44,23 @@ git config --global core.safecrlf warn
 
  
 
+
+
+
+
+[user]
+        email = tmp4321@qq.com
+        name = yann
+[alias]
+        st = status
+        lg = log --color --graph --pretty=format:'%Cred%h%Creset -%C(yellow)%d%Creset %s %Cgreen(%cr) %C(bold blue)<%an>%Creset' --abbrev-commit
+        ci = commit -m
+        co = checkout
+        br = branch
+
+[core]
+        quotepath = false
+        safecrlf = false
+        autocrlf = false
+        safecrlf=warn
 
