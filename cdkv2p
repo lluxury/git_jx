@@ -1,0 +1,126 @@
+from aws_cdk import (
+    # Duration,
+    Stack,
+    # aws_sqs as sqs,
+)
+from constructs import Construct
+
+# Paste your entire CDK code here
+import aws_cdk as cdk
+from aws_cdk import aws_s3 as _s3, aws_cloudfront as _cloudfront, aws_s3_deployment as _s3_deployment
+from constructs import Construct
+
+from aws_cdk import aws_wafv2 as waf
+from aws_cdk import aws_certificatemanager as acm
+from aws_cdk import aws_route53 as route53
+
+#class DeployCloudfrontOaiStaticSiteStack(cdk.Stack):
+class HelloCdkStack(cdk.Stack):
+
+    def __init__(self, scope: Construct, construct_id: str, **kwargs) -> None:
+        super().__init__(scope, construct_id, **kwargs)
+
+        # The code that defines your stack goes here
+
+        # example resource
+        # queue = sqs.Queue(
+        #     self, "HelloCdkQueue",
+        #     visibility_timeout=Duration.seconds(300),
+        # )
+
+        static_site_assets_bkt = _s3.Bucket(
+            self,
+            "assetsBucket",
+            versioned=True,
+            removal_policy=cdk.RemovalPolicy.DESTROY
+        )
+
+        # # Add assets to static site bucket ?
+        # add_assets_to_site = _s3_deployment.BucketDeployment(
+        #     self,
+        #     "deployStaticSiteAssets",
+        #     sources=[
+        #         _s3_deployment.Source.asset(
+        #             "advance_use_cases/static_assets"
+        #         )
+        #     ],
+        #     destination_bucket=static_site_assets_bkt
+        # )
+        
+        # Create OAI for Cloudfront
+        static_site_oai = _cloudfront.OriginAccessIdentity(
+            self,
+            "staticSiteOai",
+            comment=f"OAI for static site from stack:{cdk.Aws.STACK_NAME}"
+        )
+
+        # Deploy Cloudfront Configuration: Connecting OAI with static asset bucket
+        cf_source_configuration = _cloudfront.SourceConfiguration(
+            s3_origin_source=_cloudfront.S3OriginConfig(
+                s3_bucket_source=static_site_assets_bkt,
+                origin_access_identity=static_site_oai
+            ),
+            behaviors=[
+                _cloudfront.Behavior(
+                    is_default_behavior=True,
+                    compress=True,
+                    allowed_methods=_cloudfront.CloudFrontAllowedMethods.ALL,
+                    cached_methods=_cloudfront.CloudFrontAllowedCachedMethods.GET_HEAD
+                )
+            ]
+        )
+
+        # Create Cloudfront Distribution
+        static_site_distribution = _cloudfront.CloudFrontWebDistribution(
+            self,
+            "staticSiteCfDistribution",
+            comment="CDN for static website",
+            origin_configs=[cf_source_configuration],
+            price_class=_cloudfront.PriceClass.PRICE_CLASS_100
+        )
+
+
+
+        # Create a WAF web ACL
+        web_acl = waf.CfnWebACL(self, "MyWebACL",
+            scope="CLOUDFRONT",
+            visibility_config=waf.CfnWebACL.VisibilityConfigProperty(
+                cloud_watch_metrics_enabled=True,
+                metric_name="MyWebACL",
+                sampled_requests_enabled=True
+            ),
+            default_action=waf.CfnWebACL.DefaultActionProperty(allow={})  # You can customize the default action
+        )
+
+        # Associate the WAF web ACL with the CloudFront distribution
+        # distribution.node.add_dependency(web_acl)
+        static_site_distribution.node.add_dependency(web_acl)
+
+        # Create an ACM certificate  x
+        certificate = acm.DnsValidatedCertificate(self, "MyCertificate",
+            domain_name="example.com",
+            hosted_zone=route53.HostedZone.from_lookup(self, "MyHostedZone", domain_name="example.com")
+        )
+
+        # Create a Route 53 record for the CloudFront distribution x
+        route53.ARecord(self, "MyAliasRecord",
+            zone=certificate.hosted_zone,
+            target=route53.RecordTarget(alias_target=CloudFrontTarget(distribution)),
+            record_name="example.com"
+        )
+
+
+
+
+        # Output Cloudfront Url
+        output_1 = cdk.CfnOutput(
+            self,
+            "CloudfrontUrl",
+            value=f"{static_site_distribution.distribution_domain_name}",
+            description="The domain name of the static site"
+        )
+
+
+app = core.App()
+MyStack(app, "MyStack", env={'region': 'us-east-1', 'account': '123456789012'})
+app.synth()        
