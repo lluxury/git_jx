@@ -324,3 +324,81 @@ Resources:
           EnableAcceptEncodingGzip: false
         DefaultTTL: 86400
         Name: "Managed-CachingOptimizedForUncompressedObjects"
+
+
+
+
+
+
+
+
+
+
+
+
+
+# -* encoding:utf-8 -*-
+from collections import OrderedDict
+
+import yaml
+import yamlparser
+
+def get_file():
+    path = 'load.yml'
+    result2 = yamlparser.ordered_yaml_load(path)
+    # print(type(result2["p1"]))
+    # print(type(result2["p8"]))
+    # print(result2["p8"][0]["xx1"]) # 1 x
+    return(result2)
+
+def modify_file(result2):
+    result2["p8"][0]["xx1"]= "1000"
+    #print(result2["p8"][0]["xx1"])
+
+# dumpfile = open('dump.yml', 'w')
+# res2 = yamlparser.ordered_yaml_dump(result2,dumpfile, default_flow_style=False)
+# dumpfile.close()
+
+def write_file(result2):
+    with open('dump1.yml','w') as file1:
+        res2 = yamlparser.ordered_yaml_dump(result2,file1, default_flow_style=False)
+
+result2=get_file()
+modify_file(result2)
+write_file(result2)
+print("end")
+
+
+# -* encoding:utf-8 -*-
+from collections import OrderedDict
+import yaml
+import os
+
+
+def ordered_yaml_load(yaml_path, Loader=yaml.Loader,
+                      object_pairs_hook=OrderedDict):
+    class OrderedLoader(Loader):
+        pass
+
+    def construct_mapping(loader, node):
+        loader.flatten_mapping(node)
+        return object_pairs_hook(loader.construct_pairs(node))
+
+    OrderedLoader.add_constructor(
+        yaml.resolver.BaseResolver.DEFAULT_MAPPING_TAG,
+        construct_mapping)
+    with open(yaml_path) as stream:
+        return yaml.load(stream, OrderedLoader)
+
+
+def ordered_yaml_dump(data, stream=None, Dumper=yaml.SafeDumper, **kwds):
+    class OrderedDumper(Dumper):
+        pass
+
+    def _dict_representer(dumper, data):
+        return dumper.represent_mapping(
+            yaml.resolver.BaseResolver.DEFAULT_MAPPING_TAG,
+            data.items())
+
+    OrderedDumper.add_representer(OrderedDict, _dict_representer)
+    return yaml.dump(data, stream, OrderedDumper, **kwds)
