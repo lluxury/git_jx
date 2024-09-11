@@ -545,3 +545,193 @@ Parameters:
 
 Ask me anything...(Shift + Enter = line break)
 Ask me anything...(Shift + Enter = line break)
+
+
+
+麻烦帮忙写个 cloudformation 部署 eventbridge和lambda, eventbridge 监听xx,target为lambda, lambda的代码包通过s3更新,应该有s3相关配置,并关联lambda,并不是要用lambd去处理s3
+
+9/12/2024, 7:18:20 AM
+
+当然，以下是一个 CloudFormation 模板示例，它展示了如何部署一个 EventBridge 规则和 Lambda 函数，EventBridge 监听某个事件并将事件发送到 Lambda 函数。Lambda 函数的代码包从 S3 更新：
+
+yaml
+AWSTemplateFormatVersion: '2010-09-09'
+Resources:
+  # Lambda Execution Role
+  LambdaExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: LambdaExecutionPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: '*'
+              
+  # Lambda Function
+  MyLambdaFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: MyLambdaFunction
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Handler: index.handler
+      Runtime: python3.8
+      Code:
+        S3Bucket: my-code-bucket
+        S3Key: lambda/my-function.zip
+      Timeout: 60
+
+  # EventBridge Rule
+  MyEventBridgeRule:
+    Type: AWS::Events::Rule
+    Properties:
+      Description: "Trigger Lambda on specific events"
+      EventPattern:
+        source:
+          - "my.source"
+        detail-type:
+          - "my.event"
+      Targets:
+        - Arn: !GetAtt MyLambdaFunction.Arn
+          Id: "MyLambdaFunctionTarget"
+          Input: '{"key1": "value1"}'
+
+  # Permission for EventBridge to invoke Lambda
+  LambdaInvokePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref MyLambdaFunction
+      Principal: events.amazonaws.com
+      SourceArn: !GetAtt MyEventBridgeRule.Arn
+
+Outputs:
+  LambdaFunctionArn:
+    Description: "ARN of the Lambda Function"
+    Value: !GetAtt MyLambdaFunction.Arn
+  EventBridgeRuleArn:
+    Description: "ARN of the EventBridge Rule"
+    Value: !GetAtt MyEventBridgeRule.Arn
+说明：
+LambdaExecutionRole: Lambda 函数的执行角色，具有 CloudWatch Logs 权限。
+MyLambdaFunction: Lambda 函数，代码包来自 S3。
+MyEventBridgeRule: EventBridge 规则，监听指定的事件源和事件类型。
+LambdaInvokePermission: 授权 EventBridge 规则调用 Lambda 函数。
+请根据实际情况调整 EventPattern 和 S3 存储桶的名称以及对象键。
+
+
+
+
+9/12/2024, 7:21:40 AM
+
+不是特别懂,我需要一个,s3和2个lambda的cloudfunction, lambda使用s3上的xx.zip做为自身函数代码,并通过eventbridge rule去traget 另一个使用xx1.zip的lambda
+
+9/12/2024, 7:22:01 AM
+
+明白了。你需要一个 CloudFormation 模板，其中包括两个 Lambda 函数，一个从 S3 更新其代码，另一个由 EventBridge 规则触发。下面是一个示例模板，展示如何配置这两个 Lambda 函数和 EventBridge 规则：
+
+yaml
+AWSTemplateFormatVersion: '2010-09-09'
+Resources:
+  # Lambda Execution Role
+  LambdaExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: LambdaExecutionPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: '*'
+
+  # First Lambda Function from S3
+  LambdaFunction1:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: LambdaFunction1
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Handler: index.handler
+      Runtime: python3.8
+      Code:
+        S3Bucket: my-code-bucket
+        S3Key: lambda/xx.zip
+      Timeout: 60
+
+  # Second Lambda Function from S3
+  LambdaFunction2:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: LambdaFunction2
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Handler: index.handler
+      Runtime: python3.8
+      Code:
+        S3Bucket: my-code-bucket
+        S3Key: lambda/xx1.zip
+      Timeout: 60
+
+  # EventBridge Rule to Trigger Second Lambda
+  MyEventBridgeRule:
+    Type: AWS::Events::Rule
+    Properties:
+      Description: "Trigger LambdaFunction2 on specific events"
+      EventPattern:
+        source:
+          - "my.source"
+        detail-type:
+          - "my.event"
+      Targets:
+        - Arn: !GetAtt LambdaFunction2.Arn
+          Id: "LambdaFunction2Target"
+          Input: '{"key1": "value1"}'
+
+  # Permission for EventBridge to Invoke Second Lambda
+  LambdaInvokePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref LambdaFunction2
+      Principal: events.amazonaws.com
+      SourceArn: !GetAtt MyEventBridgeRule.Arn
+
+Outputs:
+  LambdaFunction1Arn:
+    Description: "ARN of LambdaFunction1"
+    Value: !GetAtt LambdaFunction1.Arn
+  LambdaFunction2Arn:
+    Description: "ARN of LambdaFunction2"
+    Value: !GetAtt LambdaFunction2.Arn
+  EventBridgeRuleArn:
+    Description: "ARN of the EventBridge Rule"
+    Value: !GetAtt MyEventBridgeRule.Arn
+说明：
+LambdaExecutionRole: Lambda 执行角色，具有日志权限。
+LambdaFunction1: 从 S3 上的 xx.zip 部署的 Lambda 函数。
+LambdaFunction2: 从 S3 上的 xx1.zip 部署的 Lambda 函数。
+MyEventBridgeRule: EventBridge 规则，用于触发 LambdaFunction2。
+LambdaInvokePermission: 允许 EventBridge 规则调用 LambdaFunction2。
+请根据实际情况调整 S3Bucket 和 S3Key，以及 EventBridge 规则中的 EventPattern。
