@@ -1,0 +1,97 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Parameters:
+  Environment:
+    Type: String
+    Description: The environment for the deployment (dev, cert, or prod).
+    AllowedValues:
+      - dev
+      - cert
+      - prod
+    Default: dev
+
+  S3Bucket:
+    Type: String
+    Description: The base name of the S3 bucket for which permissions will be granted.
+    
+  SQSQueue:
+    Type: String
+    Description: The base name of the SQS queue for which permissions will be granted.
+
+  SecretsManagerSecret:
+    Type: String
+    Description: The base name of the Secrets Manager secret for which permissions will be granted.
+
+  PolicyName:
+    Type: String
+    Description: The name of the IAM policy.
+
+  RoleName:
+    Type: String
+    Description: The name of the IAM Role to attach the policy to.
+
+  TagKey1:
+    Type: String
+    Description: The key for the first tag.
+
+  TagValue1:
+    Type: String
+    Description: The value for the first tag.
+
+  TagKey2:
+    Type: String
+    Description: The key for the second tag.
+
+  TagValue2:
+    Type: String
+    Description: The value for the second tag.
+
+Resources:
+  MyIAMPolicy:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyName: !Sub "${PolicyName}-${Environment}"
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Action:
+              - 's3:ListBucket'
+              - 's3:GetObject'
+              - 's3:PutObject'
+            Resource:
+              - !Sub arn:aws:s3:::${S3Bucket}-${Environment}
+              - !Sub arn:aws:s3:::${S3Bucket}-${Environment}/*
+          
+          - Effect: Allow
+            Action:
+              - 'sqs:SendMessage'
+              - 'sqs:ReceiveMessage'
+              - 'sqs:DeleteMessage'
+            Resource: !Sub arn:aws:sqs:${AWS::Region}:${AWS::AccountId}:${SQSQueue}-${Environment}
+
+          - Effect: Allow
+            Action:
+              - 'secretsmanager:GetSecretValue'
+              - 'secretsmanager:DescribeSecret'
+            Resource: !Sub arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:${SecretsManagerSecret}-${Environment}*
+
+          - Effect: Allow
+            Action:
+              - 'kms:Decrypt'
+              - 'kms:Encrypt'
+              - 'kms:GenerateDataKey'
+            Resource: '*'
+
+      Roles:
+        - !Ref RoleName  # Attach the policy to the specified IAM Role.
+
+      Tags:
+        - Key: !Ref TagKey1
+          Value: !Ref TagValue1
+        - Key: !Ref TagKey2
+          Value: !Ref TagValue2
+
+Outputs:
+  IAMPolicyArn:
+    Description: The ARN of the created IAM policy
+    Value: !GetAtt MyIAMPolicy.Arn
