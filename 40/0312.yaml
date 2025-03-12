@@ -1,0 +1,81 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Resources:
+  # S3 Bucket and CORS Configuration
+  MyS3Bucket:
+    Type: 'AWS::S3::Bucket'
+    Properties:
+      BucketName: my-s3-bucket-example
+
+  S3CORSConfiguration:
+    Type: 'AWS::S3::BucketCORSConfiguration'
+    Properties:
+      Bucket: !Ref MyS3Bucket
+      CORSConfiguration:
+        CORSRules:
+          - AllowedOrigins:
+              - '*'
+            AllowedMethods:
+              - GET
+              - POST
+              - PUT
+            AllowedHeaders:
+              - '*'
+            ExposeHeaders:
+              - Content-Length
+              - ETag
+
+  # CloudFront Distribution
+  MyCloudFrontDistribution:
+    Type: 'AWS::CloudFront::Distribution'
+    Properties:
+      DistributionConfig:
+        Origins:
+          - Id: 'MyS3Origin'
+            DomainName: !GetAtt MyS3Bucket.WebsiteURL
+            S3OriginConfig:
+              OriginAccessIdentity: ''
+        Enabled: 'true'
+        DefaultCacheBehavior:
+          TargetOriginId: 'MyS3Origin'
+          ViewerProtocolPolicy: 'redirect-to-https'
+          AllowedMethods:
+            Quantity: 3
+            Items:
+              - 'GET'
+              - 'POST'
+              - 'PUT'
+          CachedMethods:
+            Quantity: 2
+            Items:
+              - 'GET'
+              - 'HEAD'
+          ForwardedValues:
+            QueryString: 'false'
+            Cookies:
+              Forward: 'none'
+        HttpVersion: 'http2'
+        PriceClass: 'PriceClass_100'
+        ViewerCertificate:
+          CloudFrontDefaultCertificate: 'true'
+        ResponseHeadersPolicyId: !Ref MyCloudFrontResponseHeadersPolicy
+
+  # CloudFront Response Headers Policy for CORS
+  MyCloudFrontResponseHeadersPolicy:
+    Type: 'AWS::CloudFront::ResponseHeadersPolicy'
+    Properties:
+      ResponseHeadersPolicyConfig:
+        Name: 'CORS-Policy'
+        Comment: 'CORS headers for CloudFront'
+        CorsConfig:
+          CorsAllowOrigins:
+            - '*'
+          CorsAllowMethods:
+            - 'GET'
+            - 'POST'
+            - 'PUT'
+          CorsAllowHeaders:
+            - '*'
+          CorsExposeHeaders:
+            - 'Content-Length'
+            - 'ETag'
+          CorsMaxAgeSec: 86400
