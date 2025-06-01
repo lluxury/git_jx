@@ -1,0 +1,205 @@
+{
+	// Place your snippets for c here. Each snippet is defined under a snippet name and has a prefix, body and 
+	// description. The prefix is what is used to trigger the snippet and the body will be expanded and inserted. Possible variables are:
+	// $1, $2 for tab stops, $0 for the final cursor position, and ${1:label}, ${2:another} for placeholders. Placeholders with the 
+	// same ids are connected.
+	// Example:
+	"en01": {
+		"prefix": "en_re_up",
+		"body": [
+			"Could you kindly assist with updating the status of ticket RITMxx as it is blocking out milestones delivery scheduled",
+			"$1"
+		],
+		"description": "回应 催更"
+	},
+
+	"en11": {
+		"prefix": "en_ex_fin",
+		"body": [
+			"Regarding the $1 issure in the $2 ,I would like to inform you that all reported issure have been rectified as requested.",
+			"$1"
+		],
+		"description": "表达  完成 "
+	},
+
+	"en12": {
+		"prefix": "en_offer_help",
+		"body": [
+			"Could you use some help?",
+			"Thanks, I could use an extra set of hands.",
+			"xx ",			
+			"Do you need help doing anything?",			
+			"Well, I'm looking for $1",
+			"xx ",						
+			"Yes, Please.",			
+			"That would be a big help.",			
+			"I certainly appreciate it.",			
+			"I'm fine,but thanks for asking.",			
+		],
+		"description": "提供 帮助 "
+	},
+
+	"en13": {
+		"prefix": "en_express_tks",
+		"body": [
+			"Thanks a million! I hope it wasn't too much trouble.",
+			"Of course not. You'd do the same for me.",
+			"xx ",			
+			"I sincerely appreciate your putting me in touch with $1.",			
+			"Not at all. Please let me know if there's any thing else I can do.",
+			"xx ",						
+			"I can't thank you enough.",			
+			"Much obliged.",			
+			"Thank you taking the time to meeting with me.",			
+			"I really appreciate it.",			
+			"I hope it wasn't too much trouble.",			
+		],
+		"description": "表达 感谢  "
+	},
+
+	"en14": {
+		"prefix": "en_express_complimenting",
+		"body": [
+			"I was very impressed with the guide documents. I can tell you worked hard on it.",
+			"Thank you vry much. It's part of our push to revamp the $1.",
+			"xx ",			
+			"Might I compliment you on your excellent analysis.",			
+			"Thank you, but it was a team effort. Everyone deserves a share of the credit.",
+			"xx ",						
+			"That was awesoe.",			
+			"good job.",			
+			"I couldn't have done it without everyone's hard work.",			
+			"It must have taken forever.",					
+		],
+		"description": "表达 赞美 "
+	},
+
+	"en14": {
+		"prefix": "en_express_confusion",
+		"body": [
+			"Can you help me understand what's going on?",
+			"I'm not entirely clear what they want us to do.",
+			"I'm not sure what to make of the situation.",
+			"xx ",			
+			"Can you help me understand how the $1 works?",			
+			"Sure. First you $2. Then you $3. And thn you $4.",
+			"xx ",						
+			"can't make heads or tails of $1.",			
+			"at a loss.",							
+		],
+		"description": "表达 困惑  "
+	},
+
+	"en14": {
+		"prefix": "en_express_agreeing",
+		"body": [
+			"You can say that again!",
+			"I'm with you. This $1 isn't nearly as nice as it used to be.",
+			"I concur. There must be a way to $1.",
+			"xx ",			
+			"I concur. Let's $1 and $2 ?",			
+			"At this point. it doesn't look like we have any other choice. It's good to know you and I are on the same page.",
+			"xx ",						
+			"You're right on the money.",			
+			"I think you hit the nail on the head.",							
+			"You and I are on the same page.",							
+		],
+		"description": "表达 赞同 "
+	},
+
+	"en21": {
+		"prefix": "en_deal_up",
+		"body": [
+			"Could you kindly assist with updating the status of ticket RITMxx as it is blocking out milestones delivery scheduled in this week?",
+			"Please let me know if additional information is requested."
+		],
+		"description": "交涉  催更 "
+	},
+
+	"en22": {
+		"prefix": "en_deal_other",
+		"body": [
+			"Regarding the $1 in section $2 these were established  by XXX from $3 department.",
+			"As this fall outside my management scope, I have forwarded this email to this colleague for his direct follow-up."
+		],
+		"description": "交涉  转手 "
+	},
+
+	"en23": {
+		"prefix": "en_deal_help",
+		"body": [
+			"Give me a hand? I could use some help over here.",
+			"Tell me the $1 again, will you?",
+			"xx",
+			"Can you do me a favor? I need someone to $1",
+			"No problem. Just show me what to do.",
+			"xx",
+			"give $1 a hand",
+			"do $1 a favor.",
+			"impose on $1.",
+		],
+		"description": "交涉  求助 "
+	},
+
+	"en24": {
+		"prefix": "en_deal_permission",
+		"body": [
+			"Is it OK if I $1?",
+			"Would it be all right if I $1?",
+			"Would you mind if I $1?",
+			"xx",
+			"Absolutely. certainly. Sure.",
+			"Of course not.",
+			"I'm afraid that would be against our policy.",
+		],
+		"description": "交涉 许可"
+	},
+
+	"en31": {
+		"prefix": "en_ot_screen",
+		"body": [
+			"do you want me to screen share with you as well?",
+			"so you can see what I'm about to do. "
+		],
+		"description": "共享 桌面 "
+	},
+
+	"en32": {
+		"prefix": "en_ot_meet",
+		"body": [
+			"do you mind I create a teams meeting for us . at $1 Shanghai time , $2 in you time?",
+		],
+		"description": "订会 "
+	},
+
+	"en33": {
+		"prefix": "en_ot_recent",
+		"body": [
+			"What's up! I haven't seen you in months.",
+			"I've been $1 hard for the $2. I'm getting set to apply to $3.",
+			"xx ",
+			"How was $1?",
+			"Pretty good. We didn't have a chance to do much sightseeing, bu we ate $2",
+			"Long time no see.",
+			"It's been a while.",
+		],
+		"description": "近况 "
+	},
+
+	"en34": {
+		"prefix": "en_ot_ask",
+		"body": [
+			"Please say hello to $1 for me. I think about him sometimes.",
+			"Sure thing.",
+			"xx ",
+			"Tell the old gang I said hi.",
+			"Absolutely.",
+			"xx ",
+			"How is everything wit hthe $1 team?",
+			"Everyone's great. They sometimes ask about you.",
+		],
+		"description": "问候 "
+	},
+
+
+}
