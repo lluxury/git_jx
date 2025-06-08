@@ -1,0 +1,56 @@
+
+
+---
+
+title: 文章标题
+
+date: 2025-05-27
+
+category: tutorial
+
+draft: true
+
+tags: ["Obsidian", "效率工具"]
+
+series: "Obsidian系列"
+
+series_order: 3
+
+---
+
+Dataview
+
+📝 待发布内容看板示例
+TABLE WITHOUT ID
+  file.link                       AS "标题",  
+  dateformat(date,"yyyy-MM-dd")   AS "发布日期",  
+  category                        AS "专辑",  
+  choice(draft,"🚧","✅")     AS "状态"
+FROM ""                           
+WHERE draft = true
+SORT
+  published DESC,
+  series,
+  series_order ASC,         
+
+
+
+✅ 已发布内容看板示例
+ounter(lineounter(lineounter(lineounter(lineounter(lineounter(lineounter(lineounter(lineounter(lineounter(lineounter(lineounter(lineounter(lineounter(lineounter(line
+TABLE WITHOUT ID
+  file.link                       AS "标题",
+  dateformat(date,"yyyy-MM-dd")   AS "发布日期",
+  category                        AS "专辑",
+  choice(draft,"🚧","✅")     AS "状态",
+  tags                            AS "标签",
+  series                          AS "系列",
+  series_order                    AS "系列序号"
+FROM ""                           
+WHERE draft = false
+SORT  published DESC,
+  series,
+  series_order ASC,
+  date DESC
+
+
+https://mp.weixin.qq.com/s/JnBWtmft32fLYZIMV5sfkg
