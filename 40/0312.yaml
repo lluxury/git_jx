@@ -79,3 +79,128 @@ Resources:
             - 'Content-Length'
             - 'ETag'
           CorsMaxAgeSec: 86400
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+指定内建的redis使用efs服务呢
+
+6/9/2025, 7:19:09 PM
+
+要在 Helm 部署 Airflow 并将内建的 Redis 配置为使用 Amazon EFS（Elastic File System）作为持久化存储，可以通过修改 values.yaml 文件或使用 --set 参数来进行配置。
+
+以下是基本的步骤，指导你如何配置 Airflow 的 Redis 使用 EFS 作为存储。
+
+1. 安装 Helm Chart
+首先，确保你已经安装了 Helm 并将 Airflow 的 Helm Chart 添加到你的 Helm 仓库中。通常，你可以使用官方的 Airflow Helm Chart，或者使用自定义的 Chart。
+
+bash
+helm repo add apache-airflow https://airflow.apache.org
+helm repo update
+2. 创建 EFS 文件系统
+如果你还没有创建 EFS 文件系统，可以通过 AWS 控制台或 AWS CLI 创建一个 EFS 文件系统。
+
+bash
+aws efs create-file-system --performance-mode generalPurpose --throughput-mode bursting --region us-east-1
+3. 配置 Redis 使用 EFS
+在 values.yaml 中配置 Redis 使用 EFS。你需要为 Redis 创建一个 PersistentVolume（PV）和 PersistentVolumeClaim（PVC），并指向 EFS。
+
+修改 values.yaml 文件
+配置 Redis Persistent Volume (PV) 和 Persistent Volume Claim (PVC)
+修改 Airflow Helm Chart 中关于 Redis 部分的配置，指向你的 EFS 文件系统。
+
+yaml
+redis:
+  enabled: true
+  useExistingSecret: false
+  usePassword: false
+
+  persistence:
+    enabled: true
+    existingClaim: ""
+    storageClass: efs
+    size: 1Gi
+    accessMode: ReadWriteMany
+
+  volumeMounts:
+    - name: redis-efs
+      mountPath: /data
+创建 EFS PVC
+创建一个 PersistentVolume (PV) 和 PersistentVolumeClaim (PVC)，指向 EFS 文件系统。在 Kubernetes 集群中，EFS 持久化存储需要使用 efs-provisioner 或其他支持 EFS 的存储插件。
+
+以下是一个 PVC 和 PV 的例子：
+
+yaml
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: redis-efs-pv
+spec:
+  capacity:
+    storage: 1Gi
+  volumeMode: Filesystem
+  accessModes:
+    - ReadWriteMany
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: efs
+  persistentVolumeSource:
+    efs:
+      server: <EFS_SERVER_DNS_NAME>
+      path: /
+      readOnly: false
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: redis-efs-pvc
+spec:
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: 1Gi
+  storageClassName: efs
+将 <EFS_SERVER_DNS_NAME> 替换为你创建的 EFS 文件系统的 DNS 名称。
+
+确保 Redis 使用该 PVC
+确保 Redis 使用 redis-efs-pvc 作为它的持久化存储卷。
+
+yaml
+redis:
+  persistence:
+    enabled: true
+    existingClaim: redis-efs-pvc
+4. 部署 Airflow
+部署 Airflow 并指定这些配置：
+
+bash
+helm install airflow apache-airflow/airflow -f values.yaml
+如果你没有修改 values.yaml，也可以通过 --set 参数传递这些配置：
+
+bash
+helm install airflow apache-airflow/airflow \
+  --set redis.persistence.enabled=true \
+  --set redis.persistence.existingClaim=redis-efs-pvc \
+  --set redis.persistence.storageClass=efs
+5. 验证
+部署完成后，可以通过以下命令检查 Airflow 中 Redis 是否正确配置了 EFS：
+
+bash
+kubectl get pods -l app=airflow
+kubectl describe pod <pod-name>
+查看 Redis 的挂载路径和持久化存储是否指向了 EFS。
+
+以上是通过 Helm 部署 Airflow 并将 Redis 存储配置为 EFS 的步骤。如果你使用的是自定义的 Kubernetes 存储插件，记得参考插件的文档以确保兼容性和正确配置。
