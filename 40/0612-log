@@ -1,1 +1,201 @@
 
+# 解决 Fluent-bit 在 EKS 托管节点组上的 `could not sign request` 和 `failed to create log group` 错误
+
+您遇到的这两个错误 (`could not sign request` 和 `failed to create log group`) 通常都与 AWS 权限配置有关。以下是完整的排查和解决方案：
+
+## 1. 根本原因分析
+
+### 错误 1: "could not sign request"
+- 🔴 **问题本质**: Fluent-bit 无法获取有效的 AWS 凭证来签署 API 请求
+- 可能原因:
+  - IAM Role 未正确附加到节点组
+  - ServiceAccount 未正确配置 IRSA
+  - 节点实例角色权限不足
+
+### 错误 2: "failed to create log group"
+- 🔴 **问题本质**: 虽然有凭证，但权限不足以创建 CloudWatch Log Group
+- 可能原因:
+  - 缺少 `logs:CreateLogGroup` 权限
+  - 资源限制或区域错误
+
+## 2. 完整解决方案
+
+### 方案 A: 使用 IRSA (推荐)
+
+#### 步骤 1: 创建 IAM OIDC 提供者 (如果尚未创建)
+```bash
+eksctl utils associate-iam-oidc-provider \
+  --cluster <your-cluster-name> \
+  --region <region> \
+  --approve
+```
+
+#### 步骤 2: 创建 IAM 策略
+```bash
+cat > fluent-bit-policy.json << 'EOF'
+{
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Effect": "Allow",
+            "Action": [
+                "logs:PutLogEvents",
+                "logs:CreateLogStream",
+                "logs:CreateLogGroup",
+                "logs:DescribeLogStreams"
+            ],
+            "Resource": "*"
+        }
+    ]
+}
+EOF
+
+aws iam create-policy \
+  --policy-name FluentBitCloudWatchPolicy \
+  --policy-document file://fluent-bit-policy.json
+```
+
+#### 步骤 3: 创建 ServiceAccount 并附加策略
+```bash
+eksctl create iamserviceaccount \
+  --name fluent-bit \
+  --namespace logging \
+  --cluster <your-cluster-name> \
+  --attach-policy-arn arn:aws:iam::<your-account-id>:policy/FluentBitCloudWatchPolicy \
+  --approve \
+  --override-existing-serviceaccounts
+```
+
+#### 步骤 4: 更新 Fluent-bit 配置
+确保您的 Fluent-bit 配置 **不包含** `aws_auth` 或 `aws_credentials_file` 参数，正确配置如下：
+
+```ini
+[OUTPUT]
+    Name cloudwatch_logs
+    Match *
+    region ${AWS_REGION}
+    log_group_name /aws/eks/<cluster-name>/application
+    log_stream_prefix fluent-bit-
+    auto_create_group true
+```
+
+### 方案 B: 使用节点实例角色 (不推荐但快速)
+
+#### 步骤 1: 为节点组角色添加权限
+```bash
+# 获取节点组角色名
+NODE_ROLE=$(aws eks describe-nodegroup \
+  --cluster-name <cluster-name> \
+  --nodegroup-name <nodegroup-name> \
+  --query "nodegroup.nodeRole" --output text | cut -d '/' -f 2)
+
+# 附加策略
+aws iam attach-role-policy \
+  --role-name $NODE_ROLE \
+  --policy-arn arn:aws:iam::<your-account-id>:policy/FluentBitCloudWatchPolicy
+```
+
+#### 步骤 2: 重启 Fluent-bit Pod
+```bash
+kubectl rollout restart deployment/fluent-bit -n logging
+```
+
+## 3. 验证步骤
+
+### 检查凭证来源
+```bash
+kubectl exec -it <fluent-bit-pod> -n logging -- env | grep AWS
+```
+✅ 正确输出应包含:
+```
+AWS_ROLE_ARN=arn:aws:iam::1234567890:role/eksctl-xxx
+AWS_WEB_IDENTITY_TOKEN_FILE=/var/run/secrets/eks.amazonaws.com/serviceaccount/token
+```
+
+### 检查权限
+```bash
+kubectl exec -it <fluent-bit-pod> -n logging -- \
+  curl -s http://169.254.169.254/latest/meta-data/iam/security-credentials/
+```
+
+### 查看 CloudWatch 日志组
+```bash
+aws logs describe-log-groups \
+  --log-group-name-prefix /aws/eks/<cluster-name> \
+  --region <region>
+```
+
+## 4. 高级故障排除
+
+### 错误 1: 持续出现 "could not sign request"
+1. 检查 ServiceAccount 注解:
+   ```bash
+   kubectl describe sa fluent-bit -n logging | grep eks.amazonaws.com/role-arn
+   ```
+
+2. 验证 IAM 角色信任关系:
+   ```bash
+   aws iam get-role --role-name <fluent-bit-role-name>
+   ```
+   确保包含:
+   ```json
+   "Principal": {
+       "Federated": "arn:aws:iam::<account-id>:oidc-provider/oidc.eks.<region>.amazonaws.com/id/<cluster-oidc-id>"
+   }
+   ```
+
+### 错误 2: 持续出现 "failed to create log group"
+1. 尝试手动创建日志组:
+   ```bash
+   aws logs create-log-group \
+     --log-group-name /aws/eks/<cluster-name>/application \
+     --region <region>
+   ```
+
+2. 检查是否启用了自动创建:
+   ```ini
+   auto_create_group true
+   ```
+
+## 5. 完整 Helm Values 示例 (IRSA)
+
+```yaml
+# values.yaml
+serviceAccount:
+  create: false
+  name: fluent-bit
+  annotations:
+    eks.amazonaws.com/role-arn: arn:aws:iam::<account-id>:role/eksctl-<cluster-name>-addon-iamserviceac-Role1-XXXXXX
+
+config:
+  outputs: |
+    [OUTPUT]
+        Name cloudwatch_logs
+        Match *
+        region ${AWS_REGION}
+        log_group_name /aws/eks/<cluster-name>/application
+        log_stream_prefix fluent-bit-
+        auto_create_group true
+
+env:
+  - name: AWS_REGION
+    value: <region>
+  - name: AWS_STS_REGIONAL_ENDPOINTS
+    value: regional
+```
+
+## 6. 关键注意事项
+
+1. **不要混用凭证来源**:
+   - 如果使用 IRSA，确保节点实例角色 **不包含** CloudWatch 权限
+   - 避免同时配置 `aws_auth` 和 IRSA
+
+2. **区域一致性**:
+   - 确保 Fluent-bit 配置的 `region` 与集群区域一致
+   - 检查环境变量 `AWS_REGION` 是否正确设置
+
+3. **日志组命名**:
+   - 名称前缀必须是 `/aws/eks/`
+   - 避免使用特殊字符
+
+通过以上步骤，您的 Fluent-bit 应该能够正常发送日志到 CloudWatch。如果问题仍然存在，请提供具体的错误日志片段以便进一步诊断。
