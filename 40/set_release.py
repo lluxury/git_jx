@@ -156,3 +156,197 @@ if __name__ == "__main__":
         
         # 或者使用交互式编辑
         edit_definition_interactive(context, definition_id)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# 获取完整构建定义和流水线内容的Python代码
+
+如果您需要获取构建定义的完整JSON内容或整个流水线配置，以下是增强版的代码实现：
+
+## 1. 获取完整构建定义JSON
+
+```python
+import json
+from typing import Dict, Optional
+from samples import resource
+from utils import emit
+
+@resource('definition')
+def get_full_definition(context, definition_id: int, save_path: Optional[str] = None) -> Dict:
+    """
+    获取构建定义的完整JSON内容
+    
+    Args:
+        context: 上下文对象
+        definition_id: 构建定义ID
+        save_path: 保存JSON文件的路径(可选)
+    
+    Returns:
+        完整的构建定义JSON内容
+    """
+    build_client = context.connection.clients.get_build_client()
+    
+    # 获取完整定义(包括所有属性和配置)
+    full_definition = build_client.get_definition(
+        definition_id=definition_id,
+        include_all_properties=True
+    )
+    
+    # 转换为完整字典
+    definition_dict = full_definition.as_dict()
+    
+    if save_path:
+        try:
+            with open(save_path, 'w', encoding='utf-8') as f:
+                json.dump(definition_dict, f, indent=2, ensure_ascii=False)
+            emit(f"完整构建定义已保存到: {save_path}")
+        except Exception as e:
+            emit(f"保存文件失败: {str(e)}", level='error')
+            raise
+    
+    return definition_dict
+```
+
+## 2. 获取完整流水线配置
+
+```python
+@resource('pipeline')
+def get_full_pipeline_config(context, definition_id: int, save_path: Optional[str] = None) -> Dict:
+    """
+    获取完整的流水线配置(包括所有阶段、任务和变量)
+    
+    Args:
+        context: 上下文对象
+        definition_id: 构建定义ID
+        save_path: 保存JSON文件的路径(可选)
+    
+    Returns:
+        完整的流水线配置
+    """
+    build_client = context.connection.clients.get_build_client()
+    
+    # 获取完整定义
+    full_definition = build_client.get_definition(
+        definition_id=definition_id,
+        include_all_properties=True,
+        include_configuration=True
+    )
+    
+    # 获取流水线配置
+    config = build_client.get_build_configuration(
+        definition_id=definition_id,
+        revision=full_definition.revision
+    )
+    
+    # 组合结果
+    pipeline_data = {
+        'definition': full_definition.as_dict(),
+        'configuration': config.as_dict(),
+        'yaml': getattr(full_definition, 'yaml', None)  # 如果是YAML流水线
+    }
+    
+    if save_path:
+        try:
+            with open(save_path, 'w', encoding='utf-8') as f:
+                json.dump(pipeline_data, f, indent=2, ensure_ascii=False)
+            emit(f"完整流水线配置已保存到: {save_path}")
+        except Exception as e:
+            emit(f"保存文件失败: {str(e)}", level='error')
+            raise
+    
+    return pipeline_data
+```
+
+## 3. 使用示例
+
+```python
+# 获取特定构建定义的完整JSON
+definition_id = 123  # 替换为实际定义ID
+full_definition = get_full_definition(context, definition_id, "full_definition.json")
+
+# 获取完整流水线配置(包括阶段、任务等)
+pipeline_config = get_full_pipeline_config(context, definition_id, "pipeline_config.json")
+
+# 打印YAML配置(如果可用)
+if pipeline_config.get('yaml'):
+    print("YAML配置:")
+    print(pipeline_config['yaml'])
+else:
+    print("JSON配置:")
+    print(json.dumps(pipeline_config['configuration'], indent=2))
+```
+
+## 关键点说明
+
+1. **`as_dict()` 方法**:
+   - 将Azure DevOps对象转换为完整字典
+   - 包含所有属性和嵌套结构
+
+2. **`include_all_properties=True`**:
+   - 确保返回所有属性，而不仅仅是摘要
+
+3. **`include_configuration=True`**:
+   - 获取流水线配置细节(阶段、任务等)
+
+4. **YAML流水线支持**:
+   - 检查并返回YAML配置(如果是YAML定义的流水线)
+
+5. **错误处理**:
+   - 文件保存错误处理
+   - 清晰的用户反馈
+
+## 高级用法
+
+如果您需要更细粒度的控制，可以添加以下功能：
+
+```python
+@resource('pipeline')
+def export_pipeline_with_resources(context, definition_id: int) -> Dict:
+    """
+    导出流水线及其相关资源(变量组、服务连接等)
+    """
+    build_client = context.connection.clients.get_build_client()
+    extension_client = context.connection.clients.get_extension_client()
+    
+    # 获取定义
+    definition = build_client.get_definition(definition_id, include_all_properties=True)
+    
+    # 获取变量组
+    variable_groups = []
+    for vg_id in definition.variable_groups or []:
+        variable_groups.append(
+            extension_client.get_variable_group(vg_id)
+    
+    # 获取服务连接
+    service_connections = []
+    for sc_id in definition.service_connections or []:
+        service_connections.append(
+            extension_client.get_service_endpoint(sc_id))
+    
+    return {
+        'definition': definition.as_dict(),
+        'variable_groups': [vg.as_dict() for vg in variable_groups],
+        'service_connections': [sc.as_dict() for sc in service_connections],
+        'repositories': definition.repository.as_dict() if definition.repository else None
+    }
+```
+
+这个版本提供了获取构建定义和流水线完整内容的能力，包括所有配置细节和可选的文件保存功能。
