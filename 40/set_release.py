@@ -350,3 +350,261 @@ def export_pipeline_with_resources(context, definition_id: int) -> Dict:
 ```
 
 这个版本提供了获取构建定义和流水线完整内容的能力，包括所有配置细节和可选的文件保存功能。
+
+
+
+
+
+
+# 获取 Release 流水线完整信息的 Python 代码
+
+以下是获取 Azure DevOps Release 流水线完整信息的 Python 实现，包括发布定义、阶段、任务和关联的构建工件等完整 JSON 输出：
+
+```python
+import json
+from typing import Dict, List, Optional
+from samples import resource
+from utils import emit
+
+@resource('release')
+def get_full_release_definition(context, definition_id: int, save_path: Optional[str] = None) -> Dict:
+    """
+    获取 Release 流水线的完整定义
+    
+    Args:
+        context: 上下文对象
+        definition_id: Release 定义ID
+        save_path: 保存JSON文件的路径(可选)
+    
+    Returns:
+        完整的 Release 定义JSON内容
+    """
+    release_client = context.connection.clients.get_release_client()
+    
+    # 获取完整 Release 定义
+    release_definition = release_client.get_release_definition(
+        definition_id=definition_id,
+        property_filters='*'  # 获取所有属性
+    )
+    
+    # 转换为完整字典
+    release_dict = release_definition.as_dict()
+    
+    if save_path:
+        try:
+            with open(save_path, 'w', encoding='utf-8') as f:
+                json.dump(release_dict, f, indent=2, ensure_ascii=False)
+            emit(f"完整 Release 定义已保存到: {save_path}")
+        except Exception as e:
+            emit(f"保存文件失败: {str(e)}", level='error')
+            raise
+    
+    return release_dict
+
+@resource('release')
+def get_release_pipeline_details(context, definition_id: int) -> Dict:
+    """
+    获取 Release 流水线完整详细信息(包括阶段、任务、变量和触发器)
+    
+    Args:
+        context: 上下文对象
+        definition_id: Release 定义ID
+    
+    Returns:
+        包含所有详细信息的字典
+    """
+    release_client = context.connection.clients.get_release_client()
+    
+    # 1. 获取基本定义
+    release_def = release_client.get_release_definition(definition_id, property_filters='*')
+    
+    # 2. 获取所有环境(阶段)
+    environments = []
+    for env in release_def.environments:
+        env_details = release_client.get_environment(
+            project=release_def.project.id,
+            definition_id=definition_id,
+            environment_id=env.id
+        )
+        environments.append(env_details.as_dict())
+    
+    # 3. 获取变量
+    variables = release_def.variables.as_dict() if release_def.variables else {}
+    
+    # 4. 获取触发器
+    triggers = []
+    if hasattr(release_def, 'triggers'):
+        for trigger in release_def.triggers:
+            triggers.append(trigger.as_dict())
+    
+    # 5. 获取工件(构建)定义
+    artifacts = []
+    if hasattr(release_def, 'artifacts'):
+        for artifact in release_def.artifacts:
+            artifact_detail = release_client.get_artifact(
+                project=release_def.project.id,
+                release_id=None,  # 获取定义级别的工件
+                artifact_type=artifact.type,
+                artifact_name=artifact.alias
+            )
+            artifacts.append(artifact_detail.as_dict())
+    
+    return {
+        'definition': release_def.as_dict(),
+        'environments': environments,
+        'variables': variables,
+        'triggers': triggers,
+        'artifacts': artifacts,
+        'revision': release_def.revision,
+        'created_by': release_def.created_by.as_dict() if hasattr(release_def.created_by, 'as_dict') else str(release_def.created_by),
+        'modified_by': release_def.modified_by.as_dict() if hasattr(release_def.modified_by, 'as_dict') else str(release_def.modified_by)
+    }
+
+@resource('release')
+def export_release_pipeline(context, definition_id: int, save_path: Optional[str] = None) -> Dict:
+    """
+    导出完整的 Release 流水线配置
+    
+    Args:
+        context: 上下文对象
+        definition_id: Release 定义ID
+        save_path: 保存JSON文件的路径(可选)
+    
+    Returns:
+        完整 Release 流水线配置
+    """
+    full_details = get_release_pipeline_details(context, definition_id)
+    
+    if save_path:
+        try:
+            with open(save_path, 'w', encoding='utf-8') as f:
+                json.dump(full_details, f, indent=2, ensure_ascii=False)
+            emit(f"完整 Release 流水线配置已保存到: {save_path}")
+        except Exception as e:
+            emit(f"保存文件失败: {str(e)}", level='error')
+            raise
+    
+    return full_details
+
+# 使用示例
+if __name__ == "__main__":
+    # 假设有一个context对象
+    context = get_context()  # 需要实现
+    
+    # 获取 Release 定义ID列表
+    release_client = context.connection.clients.get_release_client()
+    release_definitions = release_client.get_release_definitions(project="YourProjectName")
+    
+    if release_definitions:
+        # 获取第一个 Release 定义的完整信息
+        definition_id = release_definitions[0].id
+        full_release = export_release_pipeline(context, definition_id, "release_pipeline.json")
+        
+        # 打印摘要信息
+        print(f"Release 名称: {full_release['definition']['name']}")
+        print(f"阶段数量: {len(full_release['environments'])}")
+        print(f"变量数量: {len(full_release['variables'])}")
+        print(f"工件数量: {len(full_release['artifacts'])}")
+```
+
+## 功能说明
+
+1. **`get_full_release_definition`**:
+   - 获取 Release 定义的基本完整 JSON
+   - 包含所有属性和配置
+
+2. **`get_release_pipeline_details`**:
+   - 获取 Release 流水线的完整详细信息
+   - 包括阶段(环境)、任务、变量、触发器和工件
+
+3. **`export_release_pipeline`**:
+   - 导出完整 Release 流水线配置
+   - 可选保存为 JSON 文件
+
+## 输出内容结构
+
+返回的 JSON 包含以下主要部分：
+
+```json
+{
+  "definition": {
+    "id": 1,
+    "name": "Production Release",
+    "path": "\\",
+    "revision": 5,
+    "createdOn": "2023-01-01T00:00:00Z",
+    "modifiedOn": "2023-01-10T00:00:00Z"
+  },
+  "environments": [
+    {
+      "id": 1,
+      "name": "Dev",
+      "tasks": [...],
+      "conditions": [...],
+      "variables": {...}
+    },
+    {
+      "id": 2,
+      "name": "Production",
+      "approvals": [...],
+      "tasks": [...]
+    }
+  ],
+  "variables": {
+    "configUrl": {
+      "value": "https://config.example.com",
+      "isSecret": false
+    }
+  },
+  "triggers": [...],
+  "artifacts": [
+    {
+      "alias": "_Build",
+      "type": "Build",
+      "definitionReference": {
+        "definition": {
+          "id": "123",
+          "name": "Build Pipeline"
+        }
+      }
+    }
+  ]
+}
+```
+
+## 高级用法
+
+如果需要更详细的控制，可以添加以下功能：
+
+```python
+@resource('release')
+def get_environment_tasks(context, definition_id: int, environment_id: int) -> List[Dict]:
+    """
+    获取特定环境的所有任务
+    """
+    release_client = context.connection.clients.get_release_client()
+    
+    tasks = release_client.get_environment_tasks(
+        project=context.project.name,
+        definition_id=definition_id,
+        environment_id=environment_id
+    )
+    
+    return [task.as_dict() for task in tasks]
+
+@resource('release')
+def get_release_artifacts(context, release_id: int) -> List[Dict]:
+    """
+    获取特定发布版本的工件详情
+    """
+    release_client = context.connection.clients.get_release_client()
+    
+    artifacts = release_client.get_release_artifacts(
+        project=context.project.name,
+        release_id=release_id
+    )
+    
+    return [artifact.as_dict() for artifact in artifacts]
+```
+
+这段代码提供了获取 Azure DevOps Release 流水线完整信息的能力，可以根据需要进一步扩展或修改。
