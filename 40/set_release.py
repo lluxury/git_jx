@@ -608,3 +608,182 @@ def get_release_artifacts(context, release_id: int) -> List[Dict]:
 ```
 
 这段代码提供了获取 Azure DevOps Release 流水线完整信息的能力，可以根据需要进一步扩展或修改。
+
+
+
+
+20
+
+# 在 Azure DevOps 中更新 Release 定义的方法
+
+要将修改后的 JSON 更新回 Azure DevOps 的 Release 定义，您需要遵循以下步骤：
+
+## 1. 准备更新代码
+
+```python
+import json
+from azure.devops.connection import Connection
+from msrest.authentication import BasicAuthentication
+
+# 1. 设置连接
+organization_url = 'https://dev.azure.com/your-organization'
+personal_access_token = 'your-pat-token'  # 需要有Release管理权限
+credentials = BasicAuthentication('', personal_access_token)
+connection = Connection(base_url=organization_url, creds=credentials)
+
+# 2. 获取Release客户端
+release_client = connection.clients.get_release_client()
+
+def update_release_definition(project_name, release_definition_json):
+    """
+    更新Release定义
+    
+    Args:
+        project_name: 项目名称
+        release_definition_json: 修改后的Release定义JSON
+    """
+    try:
+        # 3. 确保保留必要的元数据
+        if 'id' not in release_definition_json:
+            raise ValueError("Release定义必须包含id字段")
+        
+        # 4. 更新Release定义
+        updated_definition = release_client.update_release_definition(
+            release_definition=release_definition_json,
+            project=project_name
+        )
+        
+        print(f"成功更新Release定义: {updated_definition.name} (ID: {updated_definition.id})")
+        return updated_definition
+    except Exception as e:
+        print(f"更新失败: {str(e)}")
+        raise
+```
+
+## 2. 完整工作流程
+
+```python
+# 1. 从文件读取修改后的定义
+with open('modified_release_definition.json', 'r') as f:
+    modified_definition = json.load(f)
+
+# 2. 更新定义
+update_release_definition(
+    project_name="Your Project Name",
+    release_definition_json=modified_definition
+)
+```
+
+## 3. 关键注意事项
+
+1. **必须保留的字段**：
+   - `id`: Release定义ID
+   - `revision`: 当前版本号（用于冲突检测）
+
+2. **建议更新前检查**：
+   ```python
+   # 获取当前最新版本
+   current_def = release_client.get_release_definition(
+       project="Your Project Name",
+       definition_id=modified_definition['id']
+   )
+   
+   # 确保revision匹配
+   if modified_definition.get('revision') != current_def.revision:
+       print("警告：本地版本与服务器版本不一致，可能已被他人修改")
+       # 可以选择合并变更或强制更新
+       modified_definition['revision'] = current_def.revision
+   ```
+
+3. **部分更新方法**：
+   ```python
+   # 如果只想更新特定部分（如变量）
+   def update_release_variables(project_name, definition_id, new_variables):
+       current_def = release_client.get_release_definition(project_name, definition_id)
+       current_def.variables = new_variables
+       return release_client.update_release_definition(current_def, project_name)
+   ```
+
+## 4. 错误处理建议
+
+1. **版本冲突**：
+   - 如果收到 `409 Conflict` 错误，说明有人已修改过定义
+   - 解决方案：重新获取最新版本，重新应用您的修改
+
+2. **权限问题**：
+   - 确保PAT有足够的权限（Release管理员）
+
+3. **验证变更**：
+   ```python
+   # 更新后验证
+   updated_def = release_client.get_release_definition(
+       project="Your Project Name",
+       definition_id=modified_definition['id']
+   )
+   print(f"当前版本号: {updated_def.revision}")
+   ```
+
+## 5. 完整示例脚本
+
+```python
+import json
+from azure.devops.connection import Connection
+from msrest.authentication import BasicAuthentication
+
+def get_authenticated_client():
+    """创建认证客户端"""
+    org_url = 'https://dev.azure.com/your-organization'
+    pat = 'your-pat-token'
+    return Connection(base_url=org_url, creds=BasicAuthentication('', pat)).get_release_client()
+
+def load_and_validate_definition(file_path):
+    """加载并验证定义文件"""
+    with open(file_path, 'r') as f:
+        definition = json.load(f)
+    
+    if 'id' not in definition:
+        raise ValueError("Definition must contain 'id' field")
+    return definition
+
+def update_definition_with_retry(client, project, definition, max_retries=3):
+    """带重试机制的更新"""
+    for attempt in range(max_retries):
+        try:
+            # 获取当前版本
+            current = client.get_release_definition(project, definition['id'])
+            definition['revision'] = current.revision
+            
+            # 尝试更新
+            return client.update_release_definition(definition, project)
+        
+        except Exception as e:
+            if '409' in str(e) and attempt < max_retries - 1:
+                print(f"版本冲突，重试 {attempt + 1}/{max_retries}")
+                continue
+            raise
+
+if __name__ == "__main__":
+    try:
+        client = get_authenticated_client()
+        modified_def = load_and_validate_definition('modified_release.json')
+        
+        result = update_definition_with_retry(
+            client=client,
+            project="Your Project",
+            definition=modified_def
+        )
+        
+        print(f"成功更新定义: {result.name} (Rev. {result.revision})")
+    
+    except Exception as e:
+        print(f"更新失败: {str(e)}")
+```
+
+## 6. 最佳实践建议
+
+1. **备份原始定义**：更新前总是保留原始定义的备份
+2. **小步更新**：尽量只修改必要的部分，而不是整个定义
+3. **测试环境**：先在测试项目/定义上验证您的更新逻辑
+4. **变更日志**：记录您所做的修改，便于追踪
+
+通过以上方法，您可以安全地将修改后的 JSON 定义更新回 Azure DevOps。
