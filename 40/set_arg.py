@@ -443,3 +443,156 @@ python runner.py run build build -r 2
 4. **完整保留**：仍支持`--revision`完整参数名
 
 其他文件（如`utils.py`）无需修改，保持原查找逻辑即可。这是最简洁的向后兼容方案。
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+在 Azure DevOps Python Runner 系统中，可以通过以下几种方式在函数间传递对象（如 `definitions` 对象）：
+
+---
+
+### **方法 1：使用 `context.runner_cache` (推荐)**
+这是现有框架的标准方式，最适合在示例函数间传递数据。
+
+#### 修改 `get_definitions()` 函数
+```python
+@resource('definition')
+def get_definitions(context):
+    project = find_any_project(context)
+    build_client = context.connection.clients.get_build_client()
+    definitions = build_client.get_definitions(project.id)
+    
+    # 存储到上下文缓存
+    context.runner_cache.build_definitions = definitions
+    return definitions
+```
+
+#### 在 `queue_build()` 中获取
+```python
+@resource('build')
+def queue_build(context):
+    # 从缓存获取definitions
+    definitions = getattr(context.runner_cache, 'build_definitions', None)
+    
+    if not definitions:
+        definitions = get_definitions(context)  # 重新获取
+        
+    # 使用definitions对象...
+    selected_def = definitions[0]  # 示例：选择第一个定义
+```
+
+---
+
+### **方法 2：通过返回值传递**
+适用于直接调用的场景。
+
+#### 链式调用示例
+```python
+def workflow(context):
+    # 先获取definitions
+    definitions = get_definitions(context)
+    
+    # 再传递给build函数
+    result = queue_build_with_definitions(context, definitions)
+```
+
+---
+
+### **方法 3：增强 `find_any_build_definition()`**
+改造现有查找函数使其支持从缓存获取。
+
+#### 修改后的查找函数
+```python
+def find_any_build_definition(context, use_cache=True):
+    if use_cache and hasattr(context.runner_cache, 'build_definitions'):
+        return context.runner_cache.build_definitions[0]  # 返回缓存中的第一个
+    
+    # 原始获取逻辑...
+```
+
+---
+
+### **方法 4：参数注入（适合自定义场景）**
+通过修改 `context` 对象动态添加属性。
+
+#### 在调用前注入
+```python
+# 在run_cmd或调用函数中
+context.requested_definition_id = 123  # 自定义参数
+
+# 在queue_build中读取
+def queue_build(context):
+    target_id = getattr(context, 'requested_definition_id', None)
+```
+
+---
+
+### **最佳实践建议**
+1. **优先使用 `context.runner_cache`**  
+   现有框架已为此设计，保持代码一致性。
+
+2. **缓存有效期**  
+   添加时间戳判断缓存是否过期：
+   ```python
+   if not hasattr(context.runner_cache, '_defs_expire') or \
+      context.runner_cache._defs_expire < time.time():
+       refresh_definitions(context)
+   ```
+
+3. **异常处理**  
+   缓存不存在时的回退方案：
+   ```python
+   try:
+       return context.runner_cache.build_definitions
+   except AttributeError:
+       return fetch_definitions(context)
+   ```
+
+4. **类型提示（Python 3.9+）**  
+   明确缓存对象类型：
+   ```python
+   from typing import List
+   from azure.devops.v7_1.build.models import BuildDefinition
+
+   context.runner_cache.build_definitions: List[BuildDefinition] = definitions
+   ```
+
+---
+
+### **完整调用链示例**
+```mermaid
+sequenceDiagram
+    participant User
+    participant Runner
+    participant BuildSamples
+    
+    User->>Runner: run build build --use-cache
+    Runner->>BuildSamples: get_definitions(context)
+    BuildSamples->>Runner: 存储到context.runner_cache
+    Runner->>BuildSamples: queue_build(context)
+    BuildSamples->>Runner: 从cache读取definitions
+    Runner->>User: 输出构建结果
+```
+
+---
+
+### **各方法对比**
+
+| 方法 | 优点 | 缺点 | 适用场景 |
+|------|------|------|----------|
+| `context.runner_cache` | 框架原生支持 | 需处理缓存失效 | 大多数情况 |
+| 返回值传递 | 直接明确 | 需修改调用链 | 简单工作流 |
+| 增强查找函数 | 逻辑集中 | 需改造现有函数 | 需要智能查找时 |
+| 参数注入 | 高度灵活 | 破坏封装性 | 特殊定制需求 |
+
+选择方法 1（`runner_cache`）最能保持现有代码风格，同时满足对象传递需求。
