@@ -4,6 +4,21 @@
 	// $1, $2 for tab stops, $0 for the final cursor position, and ${1:label}, ${2:another} for placeholders. Placeholders with the 
 	// same ids are connected.
 	// Example:
+	
+	"en00": {
+		"prefix": "en_ls",
+		"body": [
+			"en0回应:催更,要求解释,解释,优点,笼统,给点时间,祝贺,祝福",
+			"en1表达:完成,帮助,感谢,赞美,困惑,赞同,不赞同,拒绝,建议,观点,好消息,坏消息,目的,警告,提醒,歉意",
+			"en2交涉: 催更,转手,求助,许可,提建议,求建议,定计划,交涉,观点,主张,打断,",
+			"en3其它:共享桌面,订会,近况,问候,问事,安抚",
+		],
+		"description": "索引 待更新 "
+	},		
+	
+	
+	
+	
 	"en01": {
 		"prefix": "en_re_up",
 		"body": [
@@ -303,7 +318,7 @@
 			"xx",									
 			"I've got some bad news.",									
 		],
-		"description": "表达 好消息 "
+		"description": "表达 坏消息 "
 	},
 
 	"en1d": {
@@ -457,7 +472,7 @@
 			"xx",
 			"Let me think about it.",
 		],
-		"description": "交涉 提建议"
+		"description": "交涉 求建议"
 	},
 
 	"en27": {
