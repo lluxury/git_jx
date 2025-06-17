@@ -204,3 +204,28 @@ kubectl describe pod <pod-name>
 查看 Redis 的挂载路径和持久化存储是否指向了 EFS。
 
 以上是通过 Helm 部署 Airflow 并将 Redis 存储配置为 EFS 的步骤。如果你使用的是自定义的 Kubernetes 存储插件，记得参考插件的文档以确保兼容性和正确配置。
+
+
+
+
+
+
+
+
+managedNodeGroups:
+  - name: managed-ng-cpu-scaling
+    minSize: 1
+    maxSize: 10
+    cloudFormation:
+      Resources:
+        NodeGroupScalingPolicy:
+          Type: AWS::AutoScaling::ScalingPolicy
+          Properties:
+            AutoScalingGroupName: !Ref NodeGroup  # 引用节点组的 ASG
+            PolicyType: TargetTrackingScaling
+            TargetTrackingConfiguration:
+              PredefinedMetricSpecification:
+                PredefinedMetricType: ASGAverageCPUUtilization  # 基于 CPU 使用率
+              TargetValue: 50.0  # 目标 CPU 使用率 50%
+              ScaleOutCooldown: 300  # 扩容冷却时间（秒）
+              ScaleInCooldown: 300   # 缩容冷却时间
