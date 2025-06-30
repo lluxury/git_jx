@@ -41,3 +41,19 @@ git config --global core.autocrlf input
 #异常捕获
 core.safecrlf #不可逆转换前警告或拒绝
 git config --global core.safecrlf warn
+
+
+
+#!/bin/bash
+
+for i in *.json
+do
+    echo "Processing $i..."
+    aws events put-events --entries "[{
+        \"EventBusName\": \"default\", 
+        \"Source\": \"myApp\", 
+        \"DetailType\": \"UserLogin\", 
+        \"Detail\": \"file://$i\"
+    }]"
+done
+
