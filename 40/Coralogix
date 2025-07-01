@@ -1,0 +1,339 @@
+以下是在 **Coralogix** 中配置节点（Node）和 Pod 资源告警的完整指南，涵盖您所需的 **CPU、内存、磁盘空间** 以及 **Pod 状态** 监控：
+
+---
+
+### **1. 告警配置概览**
+| **监控对象**       | **指标名称**                          | 推荐阈值                          | 检测频率 |
+|--------------------|--------------------------------------|----------------------------------|----------|
+| Node CPU           | `node_cpu_usage_percentage`          | >80% 持续5分钟                   | 1分钟    |
+| Node 内存          | `node_memory_usage_percentage`       | >85% 持续5分钟                   | 1分钟    |
+| Node 磁盘空间      | `node_filesystem_usage_percentage`   | >90%                             | 5分钟    |
+| Pod 磁盘空间       | `container_fs_usage_bytes`           | >85% 容量限制                    | 5分钟    |
+| Pod 非 Running 状态 | `kube_pod_status_phase`              | `phase!="Running"` 持续5分钟     | 1分钟    |
+
+---
+
+### **2. Coralogix 告警规则配置步骤**
+#### **(1) 登录 Coralogix 控制台**
+- 进入 **Alerts > Manage Rules** 页面。
+
+#### **(2) 配置 Node CPU 告警**
+```yaml
+# 规则名称: Node CPU High Usage
+alert:
+  name: "Node CPU Usage > 80%"
+  query: |
+    node_cpu_usage_percentage{job="kubernetes-nodes"} > 80
+  severity: "critical"
+  for: "5m"  # 持续5分钟触发
+  labels:
+    resource_type: "node"
+    metric_type: "cpu"
+  annotations:
+    summary: "Node {{ $labels.instance }} CPU usage is {{ $value }}%"
+    action: "检查节点负载或扩容节点资源"
+```
+
+#### **(3) 配置 Node 内存告警**
+```yaml
+# 规则名称: Node Memory High Usage
+alert:
+  name: "Node Memory Usage > 85%"
+  query: |
+    node_memory_usage_percentage{job="kubernetes-nodes"} > 85
+  severity: "warning"
+  for: "5m"
+  labels:
+    resource_type: "node"
+    metric_type: "memory"
+```
+
+#### **(4) 配置 Node 磁盘空间告警**
+```yaml
+# 规则名称: Node Disk Space Low
+alert:
+  name: "Node Disk Usage > 90%"
+  query: |
+    node_filesystem_usage_percentage{device!~"tmpfs|by-uuid"} > 90
+  severity: "critical"
+  labels:
+    resource_type: "node"
+    metric_type: "disk"
+```
+
+#### **(5) 配置 Pod 磁盘空间告警**
+```yaml
+# 规则名称: Pod Disk Space Low
+alert:
+  name: "Pod Disk Usage > 85%"
+  query: |
+    (container_fs_usage_bytes{device!~"tmpfs"} / container_fs_limit_bytes{device!~"tmpfs"}) * 100 > 85
+  severity: "warning"
+  for: "5m"
+  labels:
+    resource_type: "pod"
+    metric_type: "disk"
+```
+
+#### **(6) 配置 Pod 非 Running 状态告警**
+```yaml
+# 规则名称: Pod Not Running
+alert:
+  name: "Pod Status Not Running for 5m"
+  query: |
+    kube_pod_status_phase{phase!="Running"} == 1
+  severity: "critical"
+  for: "5m"
+  labels:
+    resource_type: "pod"
+    metric_type: "status"
+  annotations:
+    action: "检查Pod日志: `kubectl logs -p {{ $labels.pod }}`"
+```
+
+---
+
+### **3. 告警通知渠道配置**
+在 **Coralogix > Alerts > Notification Settings** 中：
+1. **添加通知渠道**（如 Slack、Email、PagerDuty）。
+2. 关联上述告警规则，示例 Slack 消息模板：
+   ```text
+   [{{ .Status | toUpper }}] {{ .AlertName }}
+   *资源*: {{ .Labels.resource_type }} ({{ .Labels.instance }})
+   *当前值*: {{ .Value }}
+   *建议操作*: {{ .Annotations.action }}
+   ```
+
+---
+
+### **4. 验证告警**
+#### **(1) 手动触发测试**
+```bash
+# 模拟高CPU负载（测试Node CPU告警）
+kubectl run stress --image=progrium/stress -- --cpu 4
+```
+
+#### **(2) 检查告警状态**
+- 在 Coralogix 控制台查看 **Alerts > Active Alerts**。
+- 确认通知渠道收到消息。
+
+---
+
+### **5. 高级优化建议**
+1. **动态阈值调整**：  
+   对生产环境使用基于历史数据的动态阈值（Coralogix 的 **Anomaly Detection** 功能）。
+
+2. **告警分级**：  
+   - `critical`: Node 磁盘/CPU  
+   - `warning`: Pod 磁盘  
+
+3. **自动修复集成**：  
+   通过 Webhook 触发自动化脚本（如自动扩容节点）：
+   ```python
+   # 示例：自动清理Pod磁盘空间
+   if alert.metric_type == "disk" and alert.resource_type == "pod":
+       kubectl exec {{ pod }} -- sh -c "rm -rf /tmp/*"
+   ```
+
+---
+
+### **6. 关键排查命令**
+```bash
+# 查看节点资源
+kubectl top nodes
+
+# 检查Pod状态
+kubectl get pods --field-selector status.phase!=Running -A
+
+# 检查Pod磁盘使用
+kubectl exec <pod> -- df -h
+```
+
+---
+
+通过以上配置，您可以在 Coralogix 中全面监控 Kubernetes 集群的资源和 Pod 状态，确保及时响应异常。如需进一步定制，可利用 Coralogix 的 **Dashboard** 功能可视化这些指标。
+
+
+
+
+
+以下是关于在 Coralogix 中配置、管理告警规则及通过 API/脚本操作的完整指南：
+
+---
+
+### **1. 告警规则配置入口**
+#### **(1) 控制台手动配置**
+- **路径**：`Coralogix Web 控制台 > Alerts > Manage Rules`
+- **操作**：
+  1. 点击 **"New Alert Rule"**。
+  2. 选择 **PromQL** 作为查询语言。
+  3. 粘贴上述场景中的查询语句（如 `node_cpu_usage_percentage > 80`）。
+  4. 设置阈值、持续时间、告警级别和通知渠道。
+
+#### **(2) 规则导出/导入**
+- **导出现有规则**：
+  - 在 `Manage Rules` 页面，勾选规则后点击 **"Export"**（JSON/YAML 格式）。
+- **导入规则**：
+  - 点击 **"Import"** 上传 JSON/YAML 文件。
+
+---
+
+### **2. 通过 API 管理告警规则**
+#### **(1) 获取 API 密钥**
+- **路径**：`Settings > API Keys`
+- **权限**：需具备 `Alerts Write` 权限的密钥。
+
+#### **(2) API 请求示例**
+```bash
+# 创建告警规则（Node CPU）
+curl -X POST \
+  https://api.coralogix.com/api/v1/alerts \
+  -H 'Content-Type: application/json' \
+  -H 'Authorization: Bearer YOUR_API_KEY' \
+  -d '{
+    "name": "Node CPU High Usage",
+    "severity": "critical",
+    "query": "node_cpu_usage_percentage > 80",
+    "duration": "5m",
+    "notifications": {
+      "emails": ["team@example.com"],
+      "webhooks": ["https://your-slack-webhook"]
+    },
+    "labels": {
+      "resource_type": "node",
+      "metric_type": "cpu"
+    }
+  }'
+```
+
+#### **(3) 常用 API 端点**
+| **操作**       | **HTTP 方法** | **端点**                      |
+|----------------|--------------|-------------------------------|
+| 创建规则       | POST         | `/api/v1/alerts`              |
+| 更新规则       | PUT          | `/api/v1/alerts/{rule_id}`    |
+| 删除规则       | DELETE       | `/api/v1/alerts/{rule_id}`    |
+| 列出所有规则   | GET          | `/api/v1/alerts`              |
+
+---
+
+### **3. 通过 Terraform 自动化配置**
+#### **(1) 安装 Coralogix Provider**
+```hcl
+terraform {
+  required_providers {
+    coralogix = {
+      source = "coralogix/coralogix"
+      version = "~> 1.0"
+    }
+  }
+}
+
+provider "coralogix" {
+  api_key = "your-api-key"
+}
+```
+
+#### **(2) 定义告警规则（示例）**
+```hcl
+resource "coralogix_alert" "node_cpu_alert" {
+  name        = "Node CPU High Usage"
+  description = "Alert when node CPU exceeds 80% for 5 minutes"
+  severity    = "critical"
+  query {
+    promql = "node_cpu_usage_percentage > 80"
+  }
+  timeframe = "5m"
+  notification_groups {
+    notifications = ["email:team@example.com"]
+  }
+  labels = {
+    resource_type = "node"
+    metric_type   = "cpu"
+  }
+}
+```
+
+#### **(3) 应用配置**
+```bash
+terraform init
+terraform plan
+terraform apply
+```
+
+---
+
+### **4. 通过脚本批量导出/导入**
+#### **(1) 导出所有告警规则（Python）**
+```python
+import requests
+import json
+
+url = "https://api.coralogix.com/api/v1/alerts"
+headers = {"Authorization": "Bearer YOUR_API_KEY"}
+
+response = requests.get(url, headers=headers)
+rules = response.json()
+
+with open("coralogix_alerts_backup.json", "w") as f:
+    json.dump(rules, f, indent=2)
+```
+
+#### **(2) 批量导入规则（Bash）**
+```bash
+#!/bin/bash
+API_KEY="YOUR_API_KEY"
+RULES_FILE="alerts_to_import.json"
+
+jq -c '.[]' "$RULES_FILE" | while read rule; do
+  curl -X POST \
+    -H "Authorization: Bearer $API_KEY" \
+    -H "Content-Type: application/json" \
+    -d "$rule" \
+    https://api.coralogix.com/api/v1/alerts
+done
+```
+
+---
+
+### **5. 告警通知渠道配置**
+#### **(1) 添加 Webhook（如 Slack）**
+1. **路径**：`Alerts > Notification Settings > New Channel`
+2. **类型**：选择 `Webhook`。
+3. **URL**：填入 Slack Incoming Webhook URL。
+4. **测试**：发送测试消息验证。
+
+#### **(2) API 配置通知渠道**
+```bash
+curl -X POST \
+  https://api.coralogix.com/api/v1/notificationChannels \
+  -H 'Authorization: Bearer YOUR_API_KEY' \
+  -d '{
+    "type": "slack",
+    "name": "Slack Alerts",
+    "url": "https://hooks.slack.com/services/XXX/YYY/ZZZ"
+  }'
+```
+
+---
+
+### **6. 关键注意事项**
+1. **权限控制**：
+   - API 密钥需具有 `Alerts Read/Write` 权限。
+2. **规则冲突**：
+   - 避免重复规则（相同查询和阈值）。
+3. **监控 API 用量**：
+   - 在 `Settings > Usage` 查看 API 调用次数。
+4. **调试工具**：
+   - 使用 `Coralogix API Playground`（控制台内）测试请求。
+
+---
+
+### **7. 故障排查**
+- **问题**：API 返回 `403`  
+  **解决**：检查 API 密钥权限和时间戳（某些请求需附加 `timestamp` 参数）。
+- **问题**：告警未触发  
+  **解决**：在 `Explore` 页面手动运行 PromQL 验证数据是否存在。
+
+---
+
+通过以上方法，您可以灵活地通过界面、API 或 IaC 工具管理 Coralogix 告警规则，实现自动化运维。  
