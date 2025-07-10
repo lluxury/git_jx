@@ -1,0 +1,198 @@
+# AWS CloudFormation 完整模板：CloudFront 跨域配置（含 Preflight 支持）
+
+以下是完整的 CloudFormation 模板，专门针对 CSS、JS 和前端文件配置跨域支持，包含完整的 Preflight (OPTIONS) 请求处理：
+
+```yaml
+AWSTemplateFormatVersion: '2010-09-09'
+Description: CloudFront Distribution with CORS and Preflight support for JS, CSS and frontend files
+
+Parameters:
+  S3BucketName:
+    Type: String
+    Description: Name of the S3 bucket to serve content from
+  AllowedOrigin:
+    Type: String
+    Default: "'*'"
+    Description: The origin domain allowed for CORS (use '*' for all or specify domain)
+
+Resources:
+  # S3 Bucket with CORS configuration
+  WebsiteBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Ref S3BucketName
+      AccessControl: Private
+      CorsConfiguration:
+        CorsRules:
+          - AllowedHeaders: ['*']
+            AllowedMethods: [GET, HEAD, OPTIONS]
+            AllowedOrigins: [!Ref AllowedOrigin]
+            ExposedHeaders: []
+            MaxAge: 3000
+
+  # CloudFront Origin Access Identity
+  CloudFrontOAI:
+    Type: AWS::CloudFront::CloudFrontOriginAccessIdentity
+    Properties:
+      CloudFrontOriginAccessIdentityConfig:
+        Comment: OAI for S3 bucket access
+
+  # Bucket Policy to allow CloudFront access
+  BucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref WebsiteBucket
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              CanonicalUser: !GetAtt CloudFrontOAI.S3CanonicalUserId
+            Action: s3:GetObject
+            Resource: !Sub 'arn:aws:s3:::${S3BucketName}/*'
+
+  # CORS Response Headers Policy with Preflight support
+  CORSHeadersPolicy:
+    Type: AWS::CloudFront::ResponseHeadersPolicy
+    Properties:
+      ResponseHeadersPolicyConfig:
+        Name: CORS-Preflight-Policy
+        Comment: Policy for CORS with Preflight support
+        CorsConfig:
+          AccessControlAllowCredentials: false
+          AccessControlAllowHeaders:
+            Items: ["*"]
+          AccessControlAllowMethods:
+            Items: ["GET", "HEAD", "OPTIONS"]
+          AccessControlAllowOrigins:
+            Items: [!Ref AllowedOrigin]
+          AccessControlExposeHeaders:
+            Items: []
+          AccessControlMaxAge: 86400  # 24-hour preflight caching
+          OriginOverride: true
+
+  # CloudFront Distribution with specific cache behaviors
+  CloudFrontDistribution:
+    Type: AWS::CloudFront::Distribution
+    Properties:
+      DistributionConfig:
+        Enabled: true
+        Comment: Distribution with CORS and Preflight support
+        DefaultRootObject: index.html
+        PriceClass: PriceClass_100
+        Origins:
+          - DomainName: !GetAtt WebsiteBucket.DomainName
+            Id: S3Origin
+            S3OriginConfig:
+              OriginAccessIdentity: !Sub 'origin-access-identity/cloudfront/${CloudFrontOAI}'
+        
+        # Default behavior (for HTML files)
+        DefaultCacheBehavior:
+          TargetOriginId: S3Origin
+          ViewerProtocolPolicy: redirect-to-https
+          AllowedMethods: [GET, HEAD, OPTIONS]
+          CachedMethods: [GET, HEAD]
+          Compress: true
+          ResponseHeadersPolicyId: !Ref CORSHeadersPolicy
+          ForwardedValues:
+            QueryString: false
+            Cookies:
+              Forward: none
+          MinTTL: 0
+          DefaultTTL: 3600
+          MaxTTL: 86400
+        
+        # Special behaviors for JS, CSS and font files
+        CacheBehaviors:
+          - PathPattern: '*.js'
+            TargetOriginId: S3Origin
+            ViewerProtocolPolicy: redirect-to-https
+            AllowedMethods: [GET, HEAD, OPTIONS]
+            CachedMethods: [GET, HEAD]
+            Compress: true
+            ResponseHeadersPolicyId: !Ref CORSHeadersPolicy
+            ForwardedValues:
+              QueryString: false
+              Cookies:
+                Forward: none
+            MinTTL: 0
+            DefaultTTL: 86400  # Longer cache for static assets
+            MaxTTL: 31536000
+            
+          - PathPattern: '*.css'
+            TargetOriginId: S3Origin
+            ViewerProtocolPolicy: redirect-to-https
+            AllowedMethods: [GET, HEAD, OPTIONS]
+            CachedMethods: [GET, HEAD]
+            Compress: true
+            ResponseHeadersPolicyId: !Ref CORSHeadersPolicy
+            ForwardedValues:
+              QueryString: false
+              Cookies:
+                Forward: none
+            MinTTL: 0
+            DefaultTTL: 86400
+            MaxTTL: 31536000
+            
+          - PathPattern: '*.woff*'  # Font files
+            TargetOriginId: S3Origin
+            ViewerProtocolPolicy: redirect-to-https
+            AllowedMethods: [GET, HEAD, OPTIONS]
+            CachedMethods: [GET, HEAD]
+            Compress: true
+            ResponseHeadersPolicyId: !Ref CORSHeadersPolicy
+            ForwardedValues:
+              QueryString: false
+              Cookies:
+                Forward: none
+            MinTTL: 0
+            DefaultTTL: 86400
+            MaxTTL: 31536000
+        
+        # Error pages for SPA
+        CustomErrorResponses:
+          - ErrorCode: 403
+            ResponseCode: 200
+            ResponsePagePath: /index.html
+          - ErrorCode: 404
+            ResponseCode: 200
+            ResponsePagePath: /index.html
+
+Outputs:
+  DistributionDomainName:
+    Description: The domain name of the CloudFront distribution
+    Value: !GetAtt CloudFrontDistribution.DomainName
+  WebsiteURL:
+    Description: The website URL
+    Value: !Sub 'https://${CloudFrontDistribution.DomainName}'
+```
+
+## 关键配置说明
+
+1. **Preflight (OPTIONS) 请求支持**：
+   - 所有缓存行为都包含 `OPTIONS` 方法在 `AllowedMethods` 中
+   - 设置了 `AccessControlMaxAge: 86400` 来缓存预检请求24小时
+   - S3 桶的 CORS 配置也明确允许 `OPTIONS` 方法
+
+2. **静态资源优化**：
+   - JS、CSS 和字体文件(woff)有独立的缓存行为
+   - 静态资源有更长的TTL（86400秒=1天）
+   - 启用了压缩（Compress: true）
+
+3. **安全配置**：
+   - 使用 Origin Access Identity 安全访问 S3
+   - 强制 HTTPS 重定向（ViewerProtocolPolicy: redirect-to-https）
+   - 可通过参数指定允许的源（而不是默认使用 '*'）
+
+4. **单页应用(SPA)支持**：
+   - 自定义错误响应将 403/404 重定向到 index.html
+   - 默认根对象设置为 index.html
+
+## 部署建议
+
+1. 对于生产环境，建议将 `AllowedOrigin` 参数从默认的 '*' 改为您的具体域名
+2. 如果使用内容哈希（如 main.abcd1234.js），可以考虑启用查询字符串转发
+3. 根据流量模式调整缓存 TTL 值
+4. 如果需要自定义头，在 `AccessControlExposeHeaders` 中添加
+
+此模板提供了完整的跨域支持，特别针对前端开发中常见的 JS、CSS 和字体文件进行了优化，并确保 Preflight 请求能正确处理。
