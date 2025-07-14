@@ -1,0 +1,686 @@
+{
+	// Place your snippets for c here. Each snippet is defined under a snippet name and has a prefix, body and 
+	// description. The prefix is what is used to trigger the snippet and the body will be expanded and inserted. Possible variables are:
+	// $1, $2 for tab stops, $0 for the final cursor position, and ${1:label}, ${2:another} for placeholders. Placeholders with the 
+	// same ids are connected.
+	// Example:
+	
+	"en00": {
+		"prefix": "en_ls",
+		"body": [
+			"en0回应:催更,要求解释,解释,优点,笼统,给点时间,祝贺,祝福",
+			"en1表达:完成,帮助,感谢,赞美,困惑,赞同,不赞同,拒绝,建议,观点,好消息,坏消息,目的,警告,提醒,歉意",
+			"en2交涉: 催更,转手,求助,许可,提建议,求建议,定计划,交涉,观点,主张,打断,",
+			"en3其它:共享桌面,订会,近况,问候,问事,安抚,检查",
+		],
+		"description": "索引 待更新 "
+	},		
+	
+	
+	
+	
+	"en01": {
+		"prefix": "en_re_up",
+		"body": [
+            "Could you kindly assist with updating the status of ticket RITMxx as it is blocking out the milestones delivery scheduled",
+            "Hi $1yann I already granted access on $22th. If you still do not have access. Could you help clarify a bit about what the actual access needed?",
+            "We are getting $1error while deploying the services, $2yann from $3cp team, and $4nial from your team are continuously working on the same."
+		],
+		"description": "回应 催更"
+	},	
+	
+	"en02": {
+		"prefix": "en_re_clarifying",
+		"body": [
+            "What do you mean by $1?",
+            "Can you please repeat that? I'm not sure what you mean.",
+            "Forgive me. I don't fully understand you.",
+            "Sorry, I don't completely follow you.",
+            "xx",
+            "Forgive me. I don't entirely follow what you're saying.",
+            "I'm sorry. I didn't explain it very clearly. Let me try again.",
+            "xx",
+            "Would you mind explaining what you mean?",
+            "Sure, I mean the potential benefits of doing $1 outweigh the risks.",
+            "xx",
+            "Correct me if I'm wrong",
+            "Let me see if I've got this straight.",
+		],
+		"description": "回应 要求增加解释"
+	},
+
+		"en03": {
+		"prefix": "en_re_reasons",
+		"body": [
+            "What happened was $1",
+            "The $1 problems were caused by $2. ",
+            "As far as I can tell, all the $2 faced the same difficulties. ",
+            "The reason for the delay was a $1 glitch. ",
+            "xx",
+            "As far as I can tell, the server crashed when too many people tried to log on at the same time.",
+            "If that's the case, we need to get the problem taken care of. We can't afford for it to happen again",
+            "xx",
+            "My hands were tied",
+            "There was nothing we could do about it.",
+            "It was out of my hands.",
+		],
+		"description": "回应 提供解释 "
+	},
+
+		"en04": {
+		"prefix": "en_re_identifying_strengths",
+		"body": [
+            "My favorite thing about the $1 blend is its $2.",
+            "The $1 plan's key straight is the $2.",
+            "Your ability to communicate ideas is impressive.",
+            "I must commend the team's focus on improving the $1.",
+            "I especially like the $1's use of $2.",
+            "xx",
+            "$1's skill in handling $2 full of $3 is impressive.",
+            "No argument here. I won't last $4.",
+		],
+		"description": "指出 优点 "
+	},
+
+		"en05": {
+		"prefix": "en_re_making_vague_comments",
+		"body": [
+			"I'm not sure right now.",
+			"The $1 was very thoughtful.",
+			"I'm sorry I can't be more specific.",
+			"We need more time to $1.",
+            "We're going to look into the suggestion shortly.",
+			"xx",
+			"The $1 may take anywhere from three to six days. I'm sorry I can't be more specific.",
+			"I understand. I'd rather you take your time and get it right the first time.",
+			"xx",
+			"generally speaking ",
+			"more or less ",
+			"somewhat ",
+		],
+		"description": "回应 笼统 "
+	},
+
+		"en06": {
+		"prefix": "en_re_more_time",
+		"body": [
+            "Just a sec.",
+            "Check back with you a bit later.",
+            "Hold on a minute.",
+            "Give me just a bit more time.",
+            "It's going to take me another day, at the soonest.",
+            "Could you give me a few more days?",
+            "I'm afraid I'll need more time to complete the project.",
+            "xx",
+            "Did you figure out what's causing our network slowdown?",
+            "Not yet, but I'm getting there. Check back with me in a bit.",
+            "xx",
+            "Time is of the essence.",
+            "I want to do the best job possible.",
+            "I apologize for the delay.",
+            "Please let me know as soon as possible.",
+            "I look forward to hearing from you.",
+		],
+		"description": "回应 给点时间 "
+	},
+
+		"en07": {
+		"prefix": "en_re_congratulating",
+		"body": [
+            "Well done.",
+            "Great job!",
+            "I was thrilled to hear the message.",
+            "xx",
+            "Did you figure out what's causing our network slowdown?",
+            "Not yet, but I'm getting there. Check back with me in a bit.",
+            "xx",
+            "It couldn't have happened to a better person.",
+		],
+		"description": "回应 祝贺 彩虹屁 "
+	},
+
+		"en08": {
+		"prefix": "en_re_wishing_luck",
+		"body": [
+            "If anyone can pull it off, it's you.",
+            "I'm sure you'll do great.",
+            "Best of luck with the $1.",
+            "I wish you all the best.",
+            "You have my full support.",
+            "I hope everything goes well with your $1.",
+            "xx",
+            "Break a leg.",
+		],
+		"description": "回应 祝福 "
+	},
+
+	"en11": {
+		"prefix": "en_ex_fin",
+		"body": [
+            "Regarding the $1 issue in the $2 , I would like to inform you that all reported issues have been rectified as requested.",
+            "raw issue resolve."
+		],
+		"description": "表达  完成 "
+	},
+
+	"en12": {
+		"prefix": "en_offer_help",
+		"body": [
+            "Could you use some help?",
+            "Thanks, I could use an extra set of hands.",
+            "xx ",          
+            "Do you need help doing anything?",         
+            "Well, I'm looking for $1",
+            "xx ",                      
+            "Yes, please.",         
+            "That would be a big help.",            
+            "I certainly appreciate it.",           
+            "I'm fine, but thanks for asking.",
+		],
+		"description": "提供 帮助 "
+	},
+
+	"en13": {
+		"prefix": "en_express_tks",
+		"body": [
+            "Thanks a million! I hope it wasn't too much trouble.",
+            "Of course not. You'd do the same for me.",
+            "xx ",          
+            "I sincerely appreciate your putting me in touch with $1.",         
+            "Not at all. Please let me know if there's anything else I can do.",
+            "xx ",                      
+            "I can't thank you enough.",            
+            "Much obliged.",            
+            "Thank you for taking the time to meet with me.",            
+            "I appreciate it.",          
+            "I hope it wasn't too much trouble.",
+		],
+		"description": "表达 感谢  "
+	},
+
+	"en14": {
+		"prefix": "en_express_complimenting",
+		"body": [
+            "I was very impressed with the guide documents. I can tell you worked hard on it.",
+            "Thank you very much. It's part of our push to revamp the $1.",
+            "xx ",          
+            "Might I compliment you on your excellent analysis?",           
+            "Thank you, but it was a team effort. Everyone deserves a share of the credit.",
+            "xx ",                      
+            "That was awesome.",         
+            "Good job.",            
+            "I couldn't have done it without everyone's hard work.",            
+            "It must have taken forever.",  			
+		],
+		"description": "表达 赞美 "
+	},
+
+	"en15": {
+		"prefix": "en_express_confusion",
+		"body": [
+            "Can you help me understand what's going on?",
+            "I'm not entirely clear what they want us to do.",
+            "I'm not sure what to make of the situation.",
+            "xx ",          
+            "Can you help me understand how the $1 works?",         
+            "Sure. First you $2. Then you $3. And then you $4.",
+            "xx ",                      
+            "can't make heads or tails of $1.",         
+            "at a loss.",   						
+		],
+		"description": "表达 困惑  "
+	},
+
+	"en16": {
+		"prefix": "en_express_agreeing",
+		"body": [
+			"You can say that again!",
+			"I'm with you. This $1 isn't nearly as nice as it used to be.",
+			"I concur. There must be a way to $1.",
+			"xx ",			
+			"I concur. Let's $1 and $2 ?",			
+			"At this point. It doesn't look like we have any other choice. It's good to know you and I are on the same page.",
+			"xx ",						
+			"You're right on the money.",			
+			"I think you hit the nail on the head.",							
+			"You and I are on the same page.",							
+		],
+		"description": "表达 赞同 "
+	},
+
+	"en17": {
+		"prefix": "en_express_disagreeing",
+		"body": [
+            "That doesn't quite sound right. I think the $1 is $2.",
+            "I see things a little differently. There are other options besides $1",
+            "I don't quite see the issue the same way.",
+            "xx ",          
+            "To tell the truth, I disagree with the decision to change $1. I've spoken with a few other people who feel the same way.",         
+            "I'll raise your concerns at the next $3 meeting.", 				
+		],
+		"description": "表达 不赞同 "
+	},
+
+	"en18": {
+		"prefix": "en_express_sya_no",
+		"body": [
+			"Because of the state of the $1, the timing isn't right for us.",
+			"We talked it over, and we couldn't reach a consensus. I'm sorry.",
+			"The quality of your $1 was excellent, but we're in a restructuring period.",					
+		],
+		"description": "表达 拒绝 "
+	},
+
+	"en19": {
+		"prefix": "en_express_advice",
+		"body": [
+			"To get inspiration to deal with $1, you might want to review the implementation in $2. They have developed a suitable solution for $1 that will meet your requirements well.",
+			"You'd better $1.",
+			"My advice would to be $1.",
+			"You might want to consider $1.",					
+			"I recommend following some $1 on xx, if you want to $2.",					
+		],
+		"description": "表达 建议 "
+	},
+
+	"en1a": {
+		"prefix": "en_express_opinion",
+		"body": [
+            "In my opinion $1.",
+            "From my perspective, nothing needs to be changed.",
+            "Maybe we should consider $1ing.",                  
+            "It might be useful to set up a $1.",                   
+            "xx",                   
+            "From my perspective, there's no downside to $1ing.",                   
+            "Well, there is the $2. But I like your proactive thinking.",                   
+            "xx",                   
+            "point of view ",                   
+            "vantage point ",                   
+            "way of thinking ", 				
+		],
+		"description": "表达 观点 "
+	},
+
+	"en1b": {
+		"prefix": "en_express_good_news",
+		"body": [
+			"I have some wonderful news. We're $1.",
+			"I'm happy to be able to tell you that $1.",					
+			"xx",									
+			"That's fantastic.",									
+		],
+		"description": "表达 好消息 "
+	},
+
+	"en1c": {
+		"prefix": "en_express_bed_news",
+		"body": [
+			"I'm afraid that the  $1 was cancelled because of the $2.",
+			"Sorry to be the bearer of bad news, but the $1 plan might not go forward.",					
+			"xx",									
+			"I've got some bad news.",									
+		],
+		"description": "表达 坏消息 "
+	},
+
+	"en1d": {
+		"prefix": "en_express_purpose_intent",
+		"body": [
+            "I hope I can find out what happened.",
+            "I only want to avoid any misunderstandings.",                 
+            "We're looking to prevent future $1 from happening.",                   
+            "Our purpose is to find a way to reduce the $1error rate.",                 
+            "xx",                                   
+            "What are you working on?",                                 
+            "Well, these days I'm focusing on completing the integration of $1 we recently $2.",                                    
+            "xx",                                   
+            "I've got some bad news.",  								
+		],
+		"description": "表达 目的 "
+	},
+
+	"en1e": {
+		"prefix": "en_express_warning",
+		"body": [
+			"Watch $1.",
+			"Word of warning: $1 will $2 if you use $3.",					
+			"Pay attention to the $1.",					
+			"Don't take any unnecessary chances.",					
+			"Acting too fast could be risky.",					
+			"xx",									
+			"What are you working on?",									
+			"Well, these days I'm focusing on completing the integration of $1 we recently $2.",									
+			"xx",									
+			"Keep a close eye on things.",									
+		],
+		"description": "表达 警告 "
+	},
+
+	"en1f": {
+		"prefix": "en_express_reminding",
+		"body": [
+            "Hi $1yann I'll be taking a leave this $2Friday. Please let me know if any urgent or high-priority matters need to be addressed in advance.",
+            "Remember to $1.",
+            "Make a note of $1.",                   
+            "I'll send you a reminder in a few days.",                  
+            "Please keep in mind that $1.",                 
+            "Acting too fast could be risky.",                  
+            "xx",                                   
+            "I hope I can remember the date of $1",                                 
+            "I'll remind you again the day before the $1.",                                 
+            "xx",                                   
+            "I'll keep that in mind.",                                  
+            "Thanks for the reminder.",                                 
+            "Thanks for reminding me.",                                 
+            "Please send me another reminder so I don't forget.",   								
+		],
+		"description": "表达 提醒 "
+	},
+
+	"en1g": {
+		"prefix": "en_express_apologizing ",
+		"body": [
+			"My bad.",
+			"Sorry about that. I should have been more careful.",					
+			"I am so sorry.",					
+			"I'm very sorry about the $1.",					
+			"I'd like to apologize for making you wait.",					
+			"Pardon me for the intrusion.",					
+			"xx",									
+			"You forgot to add my presentation to the $1",									
+			"Sorry about that. It wasn't intentional. Give me five minutes, and I'll fix it.",									
+			"xx",									
+			"It was a complete accident.",									
+			"I didn't mean it.",									
+			"It was senseless of me.",									
+			"It won't happen again.",									
+			"It's my fault.",									
+			"I accept full responsibility.",									
+			"The blame rests squarely on my shoulders.",									
+		],
+		"description": "表达 歉意 "
+	},
+
+	
+	"en21": {
+		"prefix": "en_deal_up",
+		"body": [
+            "Could you kindly assist with updating the status of ticket RITMxx as it is blocking out the milestones delivery scheduled for this week?",
+            "There is something that blocks the $1project development.",
+            "Would you kindly let me know what the issue is right now?",
+            "Please let me know if additional information is requested.",
+            "Hi $1yann any update on this, as it is impacting other $2pipelines also.",
+            "Hi $1yann still same issue,it is impacting our all $2pipeline and $3yann team is not able to do any $4xx work.",
+            "Hi $1yann it impacted Yesterday's $2xx deliveries and is again impacting today. Could you please resolve this issue on a priority basis? I hope you already initiated the resolution.",
+            "Please check the email and confirm if the $1list mentioned is confirmed."
+		],
+		"description": "交涉  催更 "
+	},
+
+	"en22": {
+		"prefix": "en_deal_other",
+		"body": [
+            "Regarding the $1 in section $2, these were established  by XXX from $3 department.",
+            "As this falls outside my management scope, I have forwarded this email to this colleague for his direct follow-up."
+		],
+		"description": "交涉  转手 "
+	},
+
+	"en23": {
+		"prefix": "en_deal_help",
+		"body": [
+            "Give me a hand? I could use some help over here.",
+            "Tell me the $1 again, will you?",
+            "Hi $1yann all $2agent are offline in $3dev so that reason our $4pipeline is not running. Can you check that please?",
+            "Can someone help here, Our $1services are not working and we are kind of stuck in this position. Please on priority.",
+            "xx",
+            "Can you do me a favor? I need someone to $1",
+            "No problem. Just show me what to do.",
+            "xx",
+            "Give $1 a hand",
+            "Do $1 a favor.",
+            "impose on $1.",
+		],
+		"description": "交涉  求助 "
+	},
+
+	"en24": {
+		"prefix": "en_deal_permission",
+		"body": [
+            "Is it OK if I $1?",
+            "Would it be all right if I $1?",
+            "Would you mind if I $1?",
+            "xx",
+            "Absolutely. Certainly. Sure.",
+            "Of course not.",
+            "I'm afraid that would be against our policy.",
+		],
+		"description": "交涉 许可"
+	},
+
+	"en25": {
+		"prefix": "en_deal_suggestion",
+		"body": [
+            "Try telling $1 that his moodiness is trying to affect you.",
+            "I'm not sure. He's been through a lot, and I don't want to upset him.",
+            "This is a complex issue; we’d better $1",
+            "If you have any issues, please feel free to let me know",
+            "Can you please set up and let $1yann know in case of any issues.",
+            "xx",
+            "That's a really good idea.",
+            "Thanks for the suggestion.",
+            "I'll think it over.",
+            "I'm not sure.",
+		],
+		"description": "交涉 提建议"
+	},
+
+	"en26": {
+		"prefix": "en_deal_ask_suggestion",
+		"body": [
+            "Can you check that and suggest what we need to resolve that issue?",
+            "Any ideas?",
+            "What do you think I should do?",
+            "Have you got any suggestions?",
+            "Tell me what to do. This is such a tricky situation.",
+            "Who do you think I should consult with? ",
+            "xx",
+            "Let me think about it.",
+		],
+		"description": "交涉 求建议"
+	},
+
+	"en27": {
+		"prefix": "en_deal_plan",
+		"body": [
+			"We should write down $1 and $2 and then make a decision.",
+			"Taking things one step at a time may be the best plan of attack.",
+            "We've talked it over, and we think $1.",
+			"A conservative plan would be to focus on $1.",
+			"xx",
+			"We should find out exactly what happened and then make a decision.",
+			"Sounds like a solid plan. We don't want to do anything hasty before the facts are all in.",
+			"xx",
+			"plan of attack.",
+			"course of action.",
+			"things to do.",
+		],
+		"description": "交涉 定计划"
+	},
+
+	"en28": {
+		"prefix": "en_deal_negotiation",
+		"body": [
+			"Can I take a few days to consider your offer??",
+			"If you're willing to $1, I can pay a higher $2. ",
+			"xx",
+			"Can I have a week or two to consider your offer?",
+			"Absolutely. Please take your time.",
+			"xx",
+			"I'm afraid my hands are tied",
+			"I'll check with my boss and see if we can do that.",
+			"How soon do you need to know?",
+		],
+		"description": "交涉 交涉"
+	},
+
+	"en29": {
+		"prefix": "en_deal_opinion",
+		"body": [
+            "What do you think? Should the $1 be extended by 30 minutes?",
+            "How do you feel about hiring someone to $1?",
+            "I'd love to hear your thoughts on the $1?",
+            "Your assessment would be invaluable.",
+            "I wonder what your take is on the $1.",
+            "xx",
+            "Can I ask you sometime? I'd love to hear your thoughts on the $1.",
+            "Well, on the one hand, I can understand the $1 wanting to $2. On the other hand, it would be nice to be nice to $3",
+            "xx",
+            "I wanted to get your opinion on $1.",
+            "Can I ask you something?",
+            "Would you mind if I picked your brain?",
+		],
+		"description": "交涉 观点 "
+	},
+
+	"en2a": {
+		"prefix": "en_deal_insisting",
+		"body": [
+            "There's nothing I can do about it",
+            "Let's stick with the original plan.",
+            "I can't budge on those issues.",
+            "We feel strongly about $1ing.",
+            "I hope you'll agree this is the best way forward.",
+            "xx",
+            "We feel very strongly about using a $1 method with $2.",
+            "That might be tricky, but I think we can work it out.",
+		],
+		"description": "交涉 主张 "
+	},
+
+	"en2b": {
+		"prefix": "en_deal_interrupting",
+		"body": [
+            "Can I just jump in here?",
+            "Sorry to interrupt you.",
+            "I don't mean to be rude, but we're running out of time.",
+            "Excuse me, may I make a suggestion?",
+            "Pardon the interruption.",
+            "Before we move on to the other business, I wonder if I could make a small point.",
+            "xx",
+            "So that's why I feel we're better off abandoning that $1",
+            "Excuse me, may I offer some input before we make a final decision",
+            "xx",
+            "It's all right",
+            "Please, go ahead.",
+            "If I could just finish this point first $1.",
+		],
+		"description": "交涉 打断 "
+	},
+
+
+
+	"en31": {
+		"prefix": "en_ot_screen",
+		"body": [
+            "Do you want me to screen share with you as well?",
+            "So you can see what I'm about to do. "
+		],
+		"description": "共享 桌面 "
+	},
+
+	"en32": {
+		"prefix": "en_ot_meet",
+		"body": [
+            "Do you mind if I create a Teams meeting for us. At $1 Shanghai time, $2 in your time?",
+		],
+		"description": "订会 "
+	},
+
+	"en33": {
+		"prefix": "en_ot_recent",
+		"body": [
+			"What's up! I haven't seen you in months.",
+			"I've been $1 hard for the $2. I'm getting set to apply to $3.",
+			"xx ",
+			"How was $1?",
+			"Pretty good. We didn't have a chance to do much sightseeing, but we ate $2",
+			"Long time no see.",
+			"It's been a while.",
+		],
+		"description": "近况 "
+	},
+
+	"en34": {
+		"prefix": "en_ot_ask",
+		"body": [
+            "Please say hello to $1 for me. I think about him sometimes.",
+            "Sure thing.",
+            "xx ",
+            "Tell the old gang I said hi.",
+            "Absolutely.",
+            "xx ",
+            "How is everything with the $1 team?",
+            "Everyone's great. They sometimes ask about you.",
+		],
+		"description": "问候 "
+	},
+
+	"en35": {
+		"prefix": "en_ot_information",
+		"body": [
+            "I need to know what the $1.",
+            "Does anybody know how to $1?",
+            "Could you tell me which $1 is on?",
+            "Do you think you might be able to show me how to operate the $1?",
+            "xx ",
+            "I have a quick question. Can I ask you $1?",
+            "That would be $2.",
+            "xx ",
+            "May I ask you a question?",
+            "I have a quick question.",
+            "Pardon the intrusion",
+            "Can I please ask you something?",
+		],
+		"description": "问事 "
+	},
+
+	"en36": {
+		"prefix": "en_ot_resolving_conflicts",
+		"body": [
+            "Never mind.",
+            "These things happen. It's OK",
+            "It isn't worth arguing over.",
+            "I'd love to hear your point of view.",
+            "I apologize for the misunderstanding.",
+            "xx ",
+            "I can't believe we were given such short notice. Three days isn't nearly enough time to set up such a larger $1",
+            "These things happen. Anyway, come on. We need to get started ASAP",
+            "xx ",
+            "I understand your concerns.",
+            "I can explain it.",
+            "Things got out of hand.",
+            "I value our relationship.",
+		],
+		"description": "解决 冲突 "
+	},
+
+	"en37": {
+		"prefix": "en_ot_check",
+		"body": [
+            "Hi $1 could you please check $2.", 
+            "Hi $1 After redeployment $1pipeline sucessed but $2code is not updated, can you check that please.", 
+            "Failed multiple times in $1release stage, please take a look at the following services.", 
+            "xx",
+            "Just a moment",
+             "I need to confirm something first.",
+             "Hold on a second.", 
+             "Could you share the link with me? I can check it more quickly.",
+            "The root cause seems to be a $3 configuration error.", 
+             "Let me double-check the logs.", 
+		],
+		"description": "检查 回复 "
+	},	
+
+}
+
