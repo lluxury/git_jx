@@ -1645,3 +1645,89 @@ spec:
 ```
 
 通过以上全面的超时配置和检测方法，您可以系统地排查和解决全链路中的超时问题。
+
+
+
+
+
+
+
+
+
+
+
+
+我理解这是一个测试脚本，偶尔会出现连接中断的问题。根据您提供的代码截图，我可以帮您改写脚本，使其在异常时能打印出完整的访问链接以便调试。以下是改进后的代码：
+
+import requests
+import time
+
+# 示例配置数据（根据您的截图）
+headers = {
+    # 您的headers配置
+}
+params = {
+    "enactment_type": "uksi",
+    "enactment_year": "2025",
+    "enactment_number": "833",
+    "region": "UK",
+    "designator": "AOS",
+    "uid": "8df64330cf8649fe9320a7307c1478cd"
+}
+
+# 可测试的URL列表（根据您截图中的备选URL）
+test_urls = [
+    "http://legis-repo-dev.aicat.me/api/task_edit/legislation_info",
+    "https://webtool-bkcf-dev.aicat.me/api/user/info",
+    "https://webtool-bkcf-cert.aicat-prod.me/api/user/info"
+]
+
+while True:
+    for url in test_urls:
+        try:
+            # 根据URL类型选择参数（带params或不带）
+            if "legis-repo" in url:
+                resp = requests.get(url, headers=headers, params=params)
+            else:
+                resp = requests.get(url, headers=headers)
+                
+            print(f"Success: {url} - Status: {resp.status_code}")
+            
+        except Exception as e:
+            # 打印完整请求信息（包含URL和参数）
+            full_url = f"{url}?{params}" if "legis-repo" in url else url
+            print(f"\nError accessing: {full_url}")
+            print(f"Error details: {type(e).__name__} - {str(e)}")
+            print("Possible causes:")
+            print("1. 服务器主动断开连接（RemoteDisconnected）")
+            print("2. 网络不稳定或超时")
+            print("3. 服务器配置问题\n")
+            
+    time.sleep(0.5)  # 每次循环间隔
+
+
+改进说明：
+
+1. 完整URL显示：异常时会打印出完整的访问链接（包含参数）
+
+2. 多URL测试：支持测试多个备选URL（如您截图中的注释所示）
+
+3. 详细错误诊断：
+
+  ◦ 区分带参数和不带参数的请求
+
+  ◦ 提供可能的错误原因提示
+
+4. 结构化输出：成功和失败的日志格式更清晰
+
+您可以根据实际需要调整：
+
+• headers 和 params 的具体内容
+
+• 测试URL列表
+
+• 睡眠间隔时间（当前0.5秒）
+
+• 错误处理的详细程度
+
+如果需要进一步优化（如添加重试机制、超时设置等），请告诉我具体需求。
