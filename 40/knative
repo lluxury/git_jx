@@ -1677,9 +1677,9 @@ params = {
 
 # 可测试的URL列表（根据您截图中的备选URL）
 test_urls = [
-    "http://legis-repo-dev.aicat.me/api/task_edit/legislation_info",
-    "https://webtool-bkcf-dev.aicat.me/api/user/info",
-    "https://webtool-bkcf-cert.aicat-prod.me/api/user/info"
+    "http://xx/api/task_edit/legislation_info",
+    "https://xx/api/user/info",
+    "https://xx/api/user/info"
 ]
 
 while True:
