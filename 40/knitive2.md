@@ -312,3 +312,101 @@ curl -v http://service:port 2>&1 | grep -E "HTTP/|empty"
 ```bash
 watch -n 5 'kubectl get pods -n istio-system | grep -v Running'
 ```
+
+
+### **在 AWS CloudWatch 中查询 VPC A 到 VPC B 的访问记录**
+
+要查询两个 VPC 之间的网络流量记录，您需要结合 **VPC Flow Logs** 和 **CloudWatch Logs Insights** 进行分析。以下是具体步骤：
+
+---
+
+## **1. 确保 VPC Flow Logs 已启用**
+VPC Flow Logs 会记录 VPC 的网络流量，并发送到 CloudWatch Logs 或 S3。  
+**检查方法**：
+1. 进入 **AWS VPC 控制台** → 选择 **VPC A** 和 **VPC B**。
+2. 在 **Flow Logs** 选项卡中确认是否已启用日志记录。  
+   - 如果没有，请创建 Flow Log：
+     - **目标**：CloudWatch Logs
+     - **IAM 角色**：需有 `logs:CreateLogGroup` 和 `logs:PutLogEvents` 权限
+     - **日志格式**：建议选择 **全部字段（All fields）**
+
+---
+
+## **2. 使用 CloudWatch Logs Insights 查询**
+进入 **CloudWatch → Logs Insights**，选择 **VPC Flow Logs 的日志组**（通常为 `/aws/vpc/flowlogs`）。  
+
+### **(1) 查询 VPC A → VPC B 的流量**
+```sql
+fields @timestamp, srcAddr, dstAddr, srcPort, dstPort, protocol, bytes, packets, action
+| filter srcAddr like /<VPC_A_CIDR>/ and dstAddr like /<VPC_B_CIDR>/
+| sort @timestamp desc
+| limit 100
+```
+**参数说明**：
+- `srcAddr`：源 IP（VPC A 的 CIDR，如 `10.0.0.0/16`）
+- `dstAddr`：目标 IP（VPC B 的 CIDR，如 `10.1.0.0/16`）
+- `action`：`ACCEPT`（允许）或 `REJECT`（拒绝）
+
+### **(2) 查询特定端口的流量（如 HTTPS 443）**
+```sql
+fields @timestamp, srcAddr, dstAddr, srcPort, dstPort, protocol
+| filter srcAddr like /<VPC_A_CIDR>/ and dstAddr like /<VPC_B_CIDR>/ and dstPort = 443
+| stats count(*) as requestCount by srcAddr, dstAddr
+| sort requestCount desc
+```
+
+### **(3) 查询被拒绝的流量（安全组/NACL 拦截）**
+```sql
+fields @timestamp, srcAddr, dstAddr, dstPort, action
+| filter srcAddr like /<VPC_A_CIDR>/ and dstAddr like /<VPC_B_CIDR>/ and action = "REJECT"
+| stats count(*) as rejectCount by srcAddr, dstAddr, dstPort
+| sort rejectCount desc
+```
+
+---
+
+## **3. 高级查询（跨账号/跨区域）**
+如果 VPC A 和 VPC B 位于 **不同 AWS 账号或区域**，需确保：
+1. **VPC Flow Logs 存储在同一 Log Group**（或使用 **Cross-Account Log Sharing**）。
+2. **查询时指定正确的日志组**：
+   ```sql
+   fields @timestamp, srcAddr, dstAddr
+   | filter srcAddr like /<VPC_A_CIDR>/ and dstAddr like /<VPC_B_CIDR>/
+   | sort @timestamp desc
+   | limit 50
+   ```
+
+---
+
+## **4. 可视化分析（可选）**
+1. **创建 CloudWatch Dashboard**：
+   - 在 **Logs Insights** 中运行查询后，点击 **"Add to dashboard"**。
+   - 可选择 **时间序列图** 或 **柱状图** 展示流量趋势。
+2. **设置告警**：
+   - 如果检测到异常流量（如大量 `REJECT` 记录），可创建 **CloudWatch Alarm** 触发 SNS 通知。
+
+---
+
+## **5. 常见问题排查**
+| **问题** | **可能原因** | **检查方法** |
+|----------|------------|-------------|
+| **查不到日志** | 1. Flow Logs 未启用<br>2. 查询时间范围错误 | 1. 检查 VPC Flow Logs 状态<br>2. 调整 `@timestamp` 范围 |
+| **只有 REJECT 记录** | 安全组/NACL 阻止 | 检查 VPC B 的安全组是否允许 VPC A 的 CIDR |
+| **流量忽高忽低** | 可能是 NAT 网关/跨区流量 | 结合 **CloudWatch Metrics** 查看 `NetworkOut`/`NetworkIn` |
+
+---
+
+## **总结**
+✅ **步骤回顾**：
+1. **确认 VPC Flow Logs 已启用**（发送到 CloudWatch Logs）。
+2. **使用 CloudWatch Logs Insights 查询**：
+   - 按 `srcAddr`（VPC A）和 `dstAddr`（VPC B）过滤。
+   - 可细化查询（如端口、协议、ACCEPT/REJECT）。
+3. **可视化或告警**（可选）。
+
+📌 **适用场景**：
+- **安全审计**（检查异常访问）
+- **网络性能分析**（流量峰值排查）
+- **跨 VPC 通信故障排查**
+
+如果有更复杂的需求（如 VPC 对等连接、Transit Gateway 流量分析），可以进一步结合 **AWS Traffic Mirroring** 或 **VPC 流日志增强版（Advanced Flow Logs）**。
