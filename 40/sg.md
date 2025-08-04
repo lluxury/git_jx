@@ -281,3 +281,134 @@ aws cloudtrail lookup-events \
 2. 确保您有足够的IAM权限访问CloudTrail和Config服务
 3. 对于组织内的跨账户操作，需要在管理账户中启用组织级跟踪
 4. 大规模环境建议使用Amazon Athena查询CloudTrail日志
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# 追踪EKS集群中修改安全组规则的Pod
+
+当您的EKS集群中的Pod在自动修改安全组(SG)规则时，通常是由于以下组件在操作：
+- Kubernetes的Service控制器（当使用NLB Service时）
+- 某些网络插件（如Calico、Cilium等）
+- 自定义控制器或Operator
+
+以下是定位具体Pod的方法：
+
+## 1. 识别修改SG的IAM角色
+
+首先确认是哪个IAM角色在执行修改操作：
+
+```bash
+aws cloudtrail lookup-events \
+  --lookup-attributes AttributeKey=EventName,AttributeValue=AuthorizeSecurityGroupIngress \
+  --start-time $(date -d "1 hour ago" +%s) \
+  --query "Events[].userIdentity.arn" \
+  --output text
+```
+
+您会看到类似这样的角色ARN：
+```
+arn:aws:sts::123456789012:assumed-role/eks-cluster-name-node-group-xxxx/i-0123456789abcdef0
+```
+
+## 2. 确定EKS工作节点
+
+从CloudTrail日志中获取执行操作的EC2实例ID：
+
+```bash
+aws cloudtrail lookup-events \
+  --lookup-attributes AttributeKey=EventName,AttributeValue=AuthorizeSecurityGroupIngress \
+  --start-time $(date -d "1 hour ago" +%s) \
+  --query "Events[].{Instance:userIdentity.sessionContext.attributes.mfaAuthenticated,IP:sourceIPAddress}" \
+  --output table
+```
+
+## 3. 关联到Kubernetes Pod
+
+登录到对应EC2实例，检查kubelet日志：
+
+```bash
+# 连接到工作节点
+ssh ec2-user@<instance-ip>
+
+# 查看kubelet日志
+sudo journalctl -u kubelet --since "1 hour ago" | grep -i "securitygroup"
+```
+
+## 4. 检查Service控制器
+
+如果是NLB Service导致的修改，检查所有LoadBalancer类型的Service：
+
+```bash
+kubectl get svc -A -o json | jq '.items[] | select(.spec.type=="LoadBalancer") | .metadata.name'
+```
+
+## 5. 检查网络插件
+
+查看网络插件日志（以AWS VPC CNI为例）：
+
+```bash
+kubectl logs -n kube-system -l k8s-app=aws-node --tail=50 | grep -i "securitygroup"
+```
+
+## 解决方案
+
+### 临时方案：限制SG修改
+```bash
+aws ec2 revoke-security-group-ingress \
+  --group-id sg-0123456789abcdef0 \
+  --ip-permissions "$(aws ec2 describe-security-groups --group-ids sg-0123456789abcdef0 --query "SecurityGroups[0].IpPermissions" --output json)"
+```
+
+### 长期方案：调整EKS配置
+
+1. **为Service控制器添加注释**（禁止修改SG）：
+   ```yaml
+   apiVersion: v1
+   kind: Service
+   metadata:
+     annotations:
+       service.beta.kubernetes.io/aws-load-balancer-security-groups: "sg-xxxx"
+       service.beta.kubernetes.io/aws-load-balancer-extra-security-groups: "sg-xxxx"
+   ```
+
+2. **更新AWS VPC CNI配置**：
+   ```bash
+   kubectl edit daemonset -n kube-system aws-node
+   ```
+   添加环境变量：
+   ```yaml
+   env:
+   - name: AWS_VPC_K8S_CNI_EXTERNALSNAT
+     value: "true"
+   ```
+
+3. **使用NetworkPolicy替代SG规则**：
+   ```yaml
+   apiVersion: networking.k8s.io/v1
+   kind: NetworkPolicy
+   metadata:
+     name: deny-all-except-nlb
+   spec:
+     podSelector: {}
+     policyTypes:
+     - Ingress
+     ingress:
+     - from:
+       - ipBlock:
+           cidr: 10.0.0.0/16  # 允许VPC内流量
+     ```
+
+通过以上方法，您可以精确定位是哪个EKS组件或Pod在修改安全组规则，并采取相应措施控制这些修改。
