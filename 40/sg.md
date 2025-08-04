@@ -203,4 +203,81 @@ spec:
 - 完全禁用自动管理可能影响其他功能的正常工作
 
 建议在测试环境验证后再应用到生产环境。如需严格限制范围，最佳实践是提前创建自定义安全组并通过 Service 注解指定。
-    
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# 查询AWS安全组规则修改记录及操作角色
+
+要查询AWS安全组(Security Group)规则的修改历史并确定执行操作的IAM角色，您可以通过以下几种方法实现：
+
+## 方法一：使用AWS CloudTrail控制台
+
+1. **登录AWS管理控制台**，导航到CloudTrail服务
+2. 在左侧菜单中选择**事件历史记录**
+3. 设置筛选条件：
+   - **事件源**：选择"ec2.amazonaws.com"
+   - **事件名称**：选择以下相关事件类型：
+     - `AuthorizeSecurityGroupIngress`
+     - `AuthorizeSecurityGroupEgress` 
+     - `RevokeSecurityGroupIngress`
+     - `RevokeSecurityGroupEgress`
+     - `ModifySecurityGroupRules`
+   - **资源名称**：输入安全组ID（如sg-0123456789abcdef0）
+4. 在查询结果中，点击具体事件查看详情，记录中的`userIdentity`字段会显示执行操作的IAM角色
+
+## 方法二：使用AWS CLI查询
+
+```bash
+aws cloudtrail lookup-events \
+  --lookup-attributes AttributeKey=EventName,AttributeValue=AuthorizeSecurityGroupIngress \
+  --lookup-attributes AttributeKey=EventName,AttributeValue=AuthorizeSecurityGroupEgress \
+  --lookup-attributes AttributeKey=EventName,AttributeValue=RevokeSecurityGroupIngress \
+  --lookup-attributes AttributeKey=EventName,AttributeValue=RevokeSecurityGroupEgress \
+  --lookup-attributes AttributeKey=ResourceName,AttributeValue=YOUR_SECURITY_GROUP_ID \
+  --start-time "2023-11-01T00:00:00Z" \
+  --end-time "2023-11-30T23:59:59Z" \
+  --query "Events[].{Time:EventTime,User:userIdentity.arn,Event:EventName,SourceIP:sourceIPAddress}" \
+  --output table
+```
+
+## 方法三：使用AWS Config
+
+1. 确保AWS Config已启用并记录EC2资源配置
+2. 导航到AWS Config控制台
+3. 选择**资源时间线**
+4. 筛选资源类型为"AWS::EC2::SecurityGroup"
+5. 输入您的安全组ID
+6. 时间线将显示所有配置变更，包括执行操作的IAM角色
+
+## 关键字段说明
+
+在CloudTrail日志中，重点关注以下字段：
+
+- `userIdentity.type`：身份类型（如IAMUser、AssumedRole等）
+- `userIdentity.arn`：执行操作的IAM实体ARN
+- `userIdentity.principalId`：唯一主体标识符
+- `userIdentity.sessionContext`：对于角色会话，包含角色ARN和创建时间
+- `eventTime`：操作发生的时间戳
+- `sourceIPAddress`：执行操作的源IP地址
+
+## 注意事项
+
+1. CloudTrail默认存储90天的事件记录，如需更长保留期需配置日志存档到S3
+2. 确保您有足够的IAM权限访问CloudTrail和Config服务
+3. 对于组织内的跨账户操作，需要在管理账户中启用组织级跟踪
+4. 大规模环境建议使用Amazon Athena查询CloudTrail日志
