@@ -316,3 +316,135 @@ Amazon Linux 2 的默认软件源里就包含了 Docker。请按以下步骤操�
 **强烈建议您先尝试第一种方法**，即使用 `sudo yum install docker`。因为 Amazon Linux 2 的官方源是为这个系统量身定做的，兼容性最好，会自动解决所有依赖关系。
 
 只有在 yum 确实完全损坏的情况下，再采用第二种手动下载强制安装的方法。手动安装后，同样需要执行 `sudo systemctl start docker` 来启动服务。
+
+
+
+
+
+
+
+new
+
+是的，完全知道！Docker 官方提供了静态编译的二进制包（`.tgz` 格式），这是解决包管理器问题的最佳方案。您不需要处理任何系统依赖，直接解压就能用。
+
+### Docker 25.0.5 静态二进制包官方下载地址
+
+您需要的 Docker 25.0.5 版本的静态二进制包可以直接从 Docker 的官方发布仓库下载：
+
+**https://download.docker.com/linux/static/stable/x86_64/docker-25.0.5.tgz**
+
+这个链接指向的是适用于 x86_64 架构的、稳定版（stable）的 Docker 25.0.5。
+
+---
+
+### 安装步骤指南
+
+1.  **下载压缩包**
+    在您的机器上，使用 `wget` 或 `curl` 命令直接下载：
+    ```bash
+    wget https://download.docker.com/linux/static/stable/x86_64/docker-25.0.5.tgz
+    ```
+    如果 `wget` 不可用，也可以使用：
+    ```bash
+    curl -O https://download.docker.com/linux/static/stable/x86_64/docker-25.0.5.tgz
+    ```
+
+2.  **解压压缩包**
+    ```bash
+    tar xzvf docker-25.0.5.tgz
+    ```
+    这会解压出一个名为 `docker/` 的目录，里面包含了所有可执行文件。
+
+3.  **将二进制文件移动到系统路径**
+    进入解压后的目录，并将所有命令拷贝到系统的可执行文件目录（如 `/usr/bin/`），这样在任何位置都可以直接运行它们。
+    ```bash
+    cd docker
+    sudo cp * /usr/bin/
+    ```
+    这将会复制包括 `dockerd` (Docker 守护进程)、`docker` (CLI 客户端)、`containerd`、`containerd-shim`、`runc`、`ctr` 等所有必要的二进制文件。
+
+4.  **创建 docker 用户组（如果不存在）**
+    ```bash
+    sudo groupadd docker
+    ```
+
+5.  **（可选但推荐）配置 Systemd 服务**
+    为了让 Docker 能够像系统服务一样方便地启动、停止和管理，最好配置 systemd。
+    *   **创建 `docker.service` 文件**：
+        ```bash
+        sudo tee /etc/systemd/system/docker.service > /dev/null <<'EOF'
+        [Unit]
+        Description=Docker Application Container Engine
+        Documentation=https://docs.docker.com
+        After=network-online.target firewalld.service containerd.service
+        Wants=network-online.target
+        Requires=containerd.service
+        
+        [Service]
+        Type=notify
+        ExecStart=/usr/bin/dockerd -H fd:// --containerd=/run/containerd/containerd.sock
+        ExecReload=/bin/kill -s HUP $MAINPID
+        TimeoutSec=0
+        RestartSec=2
+        Restart=always
+        StartLimitBurst=3
+        StartLimitInterval=60s
+        LimitNOFILE=infinity
+        LimitNPROC=infinity
+        LimitCORE=infinity
+        TasksMax=infinity
+        Delegate=yes
+        KillMode=process
+        
+        [Install]
+        WantedBy=multi-user.target
+        EOF
+        ```
+    *   **创建 `containerd.service` 文件**：
+        ```bash
+        sudo tee /etc/systemd/system/containerd.service > /dev/null <<'EOF'
+        [Unit]
+        Description=containerd container runtime
+        Documentation=https://containerd.io
+        After=network.target local-fs.target
+        
+        [Service]
+        ExecStartPre=-/sbin/modprobe overlay
+        ExecStart=/usr/bin/containerd
+        Type=notify
+        Delegate=yes
+        KillMode=process
+        Restart=always
+        RestartSec=5
+        LimitNPROC=infinity
+        LimitCORE=infinity
+        LimitNOFILE=infinity
+        TasksMax=infinity
+        OOMScoreAdjust=-999
+        
+        [Install]
+        WantedBy=multi-user.target
+        EOF
+        ```
+    *   **重新加载 systemd 并启用服务**：
+        ```bash
+        sudo systemctl daemon-reload
+        sudo systemctl enable --now containerd
+        sudo systemctl enable --now docker
+        ```
+
+6.  **验证安装**
+    ```bash
+    # 检查 dockerd 和 docker 版本
+    dockerd --version
+    docker --version
+    
+    # 运行一个测试容器
+    sudo docker run hello-world
+    ```
+
+### 总结
+
+使用官方静态二进制包 (`docker-25.0.5.tgz`) 是**最干净、最直接**的方法，完美避开了损坏的包管理器问题。您下载、解压、复制，然后就可以直接运行了，无需解决任何依赖冲突。
+
+如果您不想配置 systemd，也可以在需要时直接以后台进程方式启动守护进程：`sudo dockerd &`，但**强烈建议配置 systemd** 以便于管理。
