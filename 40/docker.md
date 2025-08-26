@@ -448,3 +448,184 @@ new
 使用官方静态二进制包 (`docker-25.0.5.tgz`) 是**最干净、最直接**的方法，完美避开了损坏的包管理器问题。您下载、解压、复制，然后就可以直接运行了，无需解决任何依赖冲突。
 
 如果您不想配置 systemd，也可以在需要时直接以后台进程方式启动守护进程：`sudo dockerd &`，但**强烈建议配置 systemd** 以便于管理。
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+在 CloudFormation 中为 ECS 配置多条启动命令，您可以使用 `Command` 属性，并通过数组形式提供多条命令。以下是几种不同的方法：
+
+## 方法一：直接使用 Command 数组（推荐）
+
+```yaml
+MyTaskDefinition:
+  Type: AWS::ECS::TaskDefinition
+  Properties:
+    Family: my-app
+    ContainerDefinitions:
+      - Name: my-container
+        Image: my-app-image:latest
+        Essential: true
+        Command:
+          - sh
+          - -c
+          - |
+            echo "容器启动开始..."
+            sleep 5
+            echo "执行初始化脚本"
+            chmod +x /app/init.sh
+            /app/init.sh
+            echo "启动主应用"
+            exec /app/main
+```
+
+## 方法二：使用多行字符串语法
+
+```yaml
+MyTaskDefinition:
+  Type: AWS::ECS::TaskDefinition
+  Properties:
+    Family: my-app
+    ContainerDefinitions:
+      - Name: my-container
+        Image: my-app-image:latest
+        Essential: true
+        Command:
+          - /bin/sh
+          - -c
+          - >
+            echo "开始执行初始化命令" &&
+            sleep 10 &&
+            echo "等待完成..." &&
+            python /app/setup.py &&
+            echo "启动服务" &&
+            exec /app/start-server.sh
+```
+
+## 方法三：复杂的多阶段启动脚本
+
+```yaml
+MyTaskDefinition:
+  Type: AWS::ECS::TaskDefinition
+  Properties:
+    Family: my-app
+    ContainerDefinitions:
+      - Name: my-container
+        Image: my-app-image:latest
+        Essential: true
+        Command:
+          - sh
+          - -c
+          - |
+            # 第一阶段：环境检查
+            echo "检查环境变量..."
+            if [ -z "$DB_HOST" ]; then
+              echo "错误: DB_HOST 未设置"
+              exit 1
+            fi
+            
+            # 第二阶段：等待依赖服务
+            echo "等待数据库就绪..."
+            for i in {1..30}; do
+              if nc -z $DB_HOST 5432; then
+                echo "数据库连接成功"
+                break
+              fi
+              echo "尝试 $i/30, 等待 2秒..."
+              sleep 2
+            done
+            
+            # 第三阶段：执行迁移
+            echo "执行数据库迁移..."
+            python manage.py migrate
+            
+            # 第四阶段：启动应用
+            echo "启动Django应用..."
+            exec gunicorn myapp.wsgi:application --bind 0.0.0.0:8000
+```
+
+## 方法四：使用 EntryPoint + Command 组合
+
+```yaml
+MyTaskDefinition:
+  Type: AWS::ECS::TaskDefinition
+  Properties:
+    Family: my-app
+    ContainerDefinitions:
+      - Name: my-container
+        Image: my-app-image:latest
+        Essential: true
+        EntryPoint:
+          - sh
+          - -c
+        Command:
+          - |
+            echo "容器启动时间: $(date)"
+            sleep 15
+            echo "配置环境..."
+            export APP_ENV=production
+            /app/wait-for-it.sh db:3306 --timeout=60
+            echo "启动应用进程"
+            exec node index.js
+```
+
+## 方法五：带错误处理的复杂示例
+
+```yaml
+MyTaskDefinition:
+  Type: AWS::ECS::TaskDefinition
+  Properties:
+    Family: my-app
+    ContainerDefinitions:
+      - Name: my-container
+        Image: my-app-image:latest
+        Essential: true
+        Command:
+          - bash
+          - -c
+          - |
+            set -e  # 遇到错误立即退出
+            
+            echo "=== 启动脚本开始 ==="
+            
+            # 等待配置文件
+            echo "等待配置文件就绪..."
+            while [ ! -f /app/config/app.conf ]; do
+              echo "配置文件不存在，等待 3秒..."
+              sleep 3
+            done
+            
+            # 设置权限
+            chmod 755 /app/scripts/*
+            
+            # 执行预处理
+            echo "执行预处理脚本..."
+            /app/scripts/prepare-environment.sh
+            
+            # 健康检查等待
+            echo "等待服务健康状态..."
+            sleep 20
+            
+            # 最终启动命令
+            echo "启动主应用程序..."
+            exec java -jar /app/app.jar --spring.profiles.active=prod
+```
+
+## 关键要点：
+
+1. **数组格式**：`Command` 属性接受字符串数组
+2. **使用 `sh -c`**：通过 `sh -c` 可以执行复杂的多命令脚本
+3. **多行语法**：使用 `|` 或 `>` 来编写多行命令
+4. **错误处理**：在脚本中加入 `set -e` 可以在命令失败时立即退出
+5. **最终命令**：通常使用 `exec` 来替换 shell 进程，让应用成为 PID 1
+
+选择最适合您需求的方法。对于复杂的启动逻辑，推荐使用方法三或方法五。
