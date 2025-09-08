@@ -1,3 +1,128 @@
+好的，这是一个关于如何为部署在 Kubernetes 上（通过 Helm）的 Airflow 配置 ALB（Application Load Balancer）以限制访问来源的详细说明。
+
+最常见的做法是在 ALB 的 **Ingress 注解 (Annotations)** 中配置安全规则。这里假设您使用的是 AWS ALB 和 AWS EKS，但核心概念也适用于其他云提供商（只需调整注解的键值即可）。
+
+### 核心方法：通过 Ingress Annotations 配置源IP限制
+
+主要使用以下两种注解：
+
+1.  `alb.ingress.kubernetes.io/security-groups`: 手动附加安全组（更传统的方式）
+2.  `alb.ingress.kubernetes.io/inbound-cidrs`： **（推荐）** 直接在 Ingress 上设置允许的 CIDR 块列表。这是最直接和云原生的方法。
+
+---
+
+### 详细配置步骤 (Helm Values.yaml)
+
+您需要在 Airflow Helm Chart 的 `values.yaml` 文件中修改 `ingress` 配置部分。
+
+#### 方案一：（推荐）使用 `alb.ingress.kubernetes.io/inbound-cidrs`
+
+此方案直接在 ALB 层面进行IP过滤，效率高且配置简单。
+
+```yaml
+# values.yaml
+ingress:
+  enabled: true
+  className: alb # 指定使用 ALB Ingress Controller
+  annotations:
+    # 核心配置：指定允许的源IP CIDR范围
+    alb.ingress.kubernetes.io/inbound-cidrs: <YOUR_OFFICE_IP_CIDR>, <YOUR_VPN_IP_CIDR>
+    # 示例: 
+    # alb.ingress.kubernetes.io/inbound-cidrs: 192.168.1.0/24, 123.45.67.89/32
+
+    # 其他必要的ALB注解
+    kubernetes.io/ingress.class: alb
+    alb.ingress.kubernetes.io/scheme: internet-facing # 或 internal
+    alb.ingress.kubernetes.io/target-type: ip
+    # 如果您使用HTTPS，还需要配置SSL和证书
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}, {"HTTPS": 443}]'
+    alb.ingress.kubernetes.io/certificate-arn: arn:aws:acm:us-west-2:XXXXXXXXX:certificate/XXXXXX-XXXXXXX-XXXXXXX-XXXXXXXX
+    alb.ingress.kubernetes.io/ssl-redirect: '443'
+
+  hosts:
+    - host: airflow.your-company.com
+      paths:
+        - path: /
+          pathType: Prefix
+```
+
+**工作原理：**
+ALB Ingress Controller 会读取 `inbound-cidrs` 注解，并自动在 ALB 的安全策略中创建规则，只允许列出的 CIDR 范围的流量通过。来自其他IP地址的请求将被 ALB **直接拒绝（返回403错误）**，甚至不会到达您的 Airflow Pod。
+
+#### 方案二：使用 `alb.ingress.kubernetes.io/security-groups`
+
+此方案允许您关联一个自定义的、预先配置好的安全组。
+
+1.  **首先，在 AWS 控制台手动创建一个安全组 (Security Group)**。在此安全组的入站规则 (Inbound rules) 中，添加允许访问的源IP和端口（例如，端口 443 的源为 `YOUR_OFFICE_IP/32`）。
+
+2.  **然后，在 Helm Values 中引用该安全组的ID**。
+
+```yaml
+# values.yaml
+ingress:
+  enabled: true
+  className: alb
+  annotations:
+    # 核心配置：附加自定义安全组
+    alb.ingress.kubernetes.io/security-groups: sg-xxxxxxxxxxxxx # 替换为你的安全组ID
+
+    # 注意：务必包含ALB Controller自动创建的安全组，否则会导致服务中断
+    alb.ingress.kubernetes.io/manage-backend-security-group-rules: 'false'
+
+    # 其他必要的ALB注解
+    kubernetes.io/ingress.class: alb
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTPS": 443}]'
+    alb.ingress.kubernetes.io/certificate-arn: arn:aws:acm:...
+
+  hosts:
+    - host: airflow.your-company.com
+      paths:
+        - path: /
+          pathType: Prefix
+```
+
+**重要提示：** 当使用 `security-groups` 注解时，**必须**设置 `alb.ingress.kubernetes.io/manage-backend-security-group-rules: 'false'`。这是因为 ALB Controller 默认会管理安全组规则以允许流量到达Pod。如果您覆盖了安全组但没有禁用此功能，Controller 会尝试修改您的自定义安全组，可能导致规则冲突。
+
+---
+
+### 部署与验证
+
+1.  **保存配置**：将上述配置更新到您的 `values.yaml` 文件中。
+2.  **升级 Helm Release**：
+    ```bash
+    helm upgrade --install my-airflow apache-airflow/airflow -n airflow -f values.yaml
+    ```
+3.  **验证**：
+    *   运行 `kubectl describe ingress <your-airflow-ingress-name> -n airflow` 命令，检查 Events 部分以及Annotations是否正确应用。
+    *   在 AWS EC2 控制台，找到对应的 ALB，查看其安全组或监听器规则，确认IP限制已生效。
+    *   **最终测试**：尝试从一个**不在允许列表内**的IP地址（例如，使用手机网络）访问您的 Airflow URL，应该收到一个 `403 Forbidden` 错误。而从允许的IP访问则一切正常。
+
+### 总结
+
+| 特性 | 方案一 (`inbound-cidrs`) | 方案二 (`security-groups`) |
+| :--- | :--- | :--- |
+| **推荐度** | ⭐⭐⭐⭐⭐ **推荐** | ⭐⭐⭐ |
+| **复杂度** | 低（仅需修改YAML） | 中（需手动创建和管理安全组） |
+| **灵活性** | 中等（仅支持CIDR规则） | 高（支持安全组的所有高级规则） |
+| **管理方式** | 声明式（GitOps友好） | 命令式/手动操作 |
+
+对于大多数场景，**方案一（`inbound-cidrs`）** 是更简单、更直接且更易于维护的选择。只有在需要非常复杂的网络规则时，才考虑使用方案二。
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 # 如何通过增加节点和参数调优加速Airflow任务处理
 
 当您希望通过增加计算节点(node)来加速Airflow任务处理时，需要调整以下几个关键参数和配置：
