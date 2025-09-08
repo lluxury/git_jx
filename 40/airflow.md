@@ -1,3 +1,101 @@
+好的，这个问题非常明确。当 Airflow Helm Chart 中 Webserver 的 `service.type` 设置为 `LoadBalancer` 时，您需要在这个 **Kubernetes Service 创建的云负载均衡器（Cloud Load Balancer）** 上直接限制源 IP。
+
+这与通过 Ingress 限制不同，配置的位置在 Webserver Service 的注解（annotations）中。
+
+---
+
+### 配置方法（以 AWS ELB/NLB 为例）
+
+假设您使用的是 AWS EKS，Webserver Service 会创建一个 Classic Load Balancer (ELB) 或 Network Load Balancer (NLB)。您需要通过 Service 的 `annotations` 来配置负载均衡器的属性。
+
+**在您的 `values.yaml` 文件中，找到并修改 `webserver` 部分：**
+
+```yaml
+# values.yaml
+
+webserver:
+  enabled: true
+  service:
+    type: LoadBalancer # 您正在使用的模式
+    # 在此处添加特定于云供应商的注解以实现源IP限制
+    annotations:
+      # AWS 特定注解：配置负载均衡器的安全组 inbound rules
+      # 方案一 (推荐): 使用 securityGroup 注解手动指定允许访问的安全组
+      service.beta.kubernetes.io/aws-load-balancer-security-groups: sg-0ab123cd456ef789g # 替换为您预先创建的安全组ID
+
+      # 方案二: 使用 extraSourceRanges 注解 (部分云提供商支持，AWS效果有限)
+      # loadBalancerSourceRanges: # 注意：这个Key可能因云厂商而异，在AWS上可能不直接作用于ELB/NLB
+      #  - "192.168.1.0/24"
+      #  - "203.0.113.10/32"
+
+      # 其他必要的负载均衡器注解
+      service.beta.kubernetes.io/aws-load-balancer-type: "nlb" # 或 "elb"，指定类型
+      service.beta.kubernetes.io/aws-load-balancer-scheme: "internal" # 强烈建议设为内网LB
+      # service.beta.kubernetes.io/aws-load-balancer-ssl-cert: "arn:aws:acm:..." # 如果需要HTTPS
+
+  # ... 其他webserver配置（端口、资源等） ...
+```
+
+---
+
+### 关键步骤和说明
+
+#### 方案一（推荐且最可靠）：使用安全组 (Security Group)
+
+这是最标准、跨版本兼容性最好的方法。
+
+1.  **手动创建安全组**：
+    *   在 AWS EC2 控制台中，创建一个新的安全组（例如 `airflow-webserver-sg`）。
+    *   在此安全组的 **入站规则（Inbound rules）** 中，**严格限制**访问源：
+        *   **类型：** 自定义 TCP
+        *   **端口：** `8080` (或您 Webserver 暴露的端口)
+        *   **来源：** 您允许的特定 CIDR 地址块（例如 `192.168.0.0/16`, `10.10.10.0/24`, 或具体的公网IP `/32`）。**绝对不要使用 `0.0.0.0/0`**。
+
+2.  **引用安全组**：
+    *   如上所示，在 Service 的 `annotations` 中，通过 `service.beta.kubernetes.io/aws-load-balancer-security-groups` 注解指定您刚创建的安全组 ID。
+    *   **重要提示**：使用此注解时，Kubernetes 会将**您指定的安全组**作为**唯一**的安全组附加到负载均衡器。它会覆盖掉默认自动创建的安全组。
+
+#### 方案二（如果支持）：
+
+`loadBalancerSourceRanges` 是一个**标准 Kubernetes 字段**，而不是注解。理论上，云提供商控制器应该会读取这个字段并将其转换为负载均衡器上的防火墙规则。
+
+```yaml
+webserver:
+  service:
+    type: LoadBalancer
+    # 尝试使用标准字段 (注意：在AWS上可能不总是生效，取决于版本和配置)
+    loadBalancerSourceRanges:
+      - "192.168.1.0/24"
+      - "203.0.113.10/32"
+    annotations:
+      service.beta.kubernetes.io/aws-load-balancer-scheme: "internal"
+```
+
+**请注意**：在 AWS 环境中，`loadBalancerSourceRanges` 的支持情况**可能因 EKS 版本和负载均衡器控制器版本而异**。它可能无法正确地将规则应用到 Classic ELB 或 NLB 上。**方案一（安全组注解）是更可靠的选择。**
+
+---
+
+### 通用最佳实践
+
+1.  **使用内部负载均衡器 (`internal`)**：如果您的用户通过 VPN 或云网络内部访问，将负载均衡器方案设置为 `internal` 可以将其从公网隐藏，这是最大的安全提升。
+2.  **结合命名空间隔离**：将 Airflow 部署在一个独立的命名空间（如 `airflow`）中。
+3.  **验证**：
+    *   部署后，在 AWS EC2 控制台找到这个新创建的负载均衡器。
+    *   检查其附加的安全组，确认入站规则是否正确设置为仅允许指定的IP段。
+    *   尝试从一个**未被允许的IP地址**访问负载均衡器的URL或IP，应该会收到 `Connection timed out` 或类似的错误。从**允许的IP**访问则应该正常。
+
+**总结：**
+要为 `LoadBalancer` 类型的 Airflow Webserver Service 限制源IP，最可靠的方法是通过 **Service Annotations** 指定一个预先配置好严格入站规则的 **AWS 安全组**。
+
+
+
+
+
+
+
+
+
+
 好的，这是一个关于如何为部署在 Kubernetes 上（通过 Helm）的 Airflow 配置 ALB（Application Load Balancer）以限制访问来源的详细说明。
 
 最常见的做法是在 ALB 的 **Ingress 注解 (Annotations)** 中配置安全规则。这里假设您使用的是 AWS ALB 和 AWS EKS，但核心概念也适用于其他云提供商（只需调整注解的键值即可）。
