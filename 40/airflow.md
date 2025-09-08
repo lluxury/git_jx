@@ -110,6 +110,151 @@ ingress:
 
 对于大多数场景，**方案一（`inbound-cidrs`）** 是更简单、更直接且更易于维护的选择。只有在需要非常复杂的网络规则时，才考虑使用方案二。
 
+非常好的问题！您指出了一个关键区别。**答案是：可以，但方法完全不同。**
+
+当 ALB 使用 `instance` 模式 (`alb.ingress.kubernetes.io/target-type: instance`) 时，流量目标是**Node（EC2实例）的节点端口**，而不是 Pod 的 IP。因此，在 ALB 层面进行的源IP限制（如 `inbound-cidrs`）仍然有效，但它只能保护到 ALB 到 Worker Node 这一层。
+
+为了在 `instance` 模式下实现端到端的严格来源限制，您需要在两个地方进行配置：
+
+### 1. ALB 层面 (保持不变) - 第一道屏障
+
+这仍然是**必要的第一道防线**，用于在入口处直接拒绝绝大部分非法请求。配置方法同上文完全一致。
+
+```yaml
+# values.yaml
+ingress:
+  enabled: true
+  className: alb
+  annotations:
+    # 第一道屏障：在ALB上限制源IP
+    alb.ingress.kubernetes.io/inbound-cidrs: <YOUR_OFFICE_IP_CIDR>, <YOUR_VPN_IP_CIDR>
+    kubernetes.io/ingress.class: alb
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/target-type: instance # 您关心的模式
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTPS": 443}]'
+    alb.ingress.kubernetes.io/certificate-arn: arn:aws:acm:...
+```
+
+### 2. Worker Node 安全组 (EC2 Security Group) - 第二道关键屏障
+
+这是 `instance` 模式下的**关键配置**。您需要修改托管您 Worker Node 的 **Auto Scaling Group** 所关联的**安全组（Security Group）**。
+
+**操作步骤（AWS 控制台）：**
+
+1.  找到您的 EKS Worker Node 所在的 EC2 实例。
+2.  查看该实例关联的安全组（通常名称包含 `eks-cluster-sg` 或 `nodegroup`）。
+3.  编辑该安全组的**入站规则（Inbound rules）**：
+    *   **删除**允许来自 ALB 安全组或任意IP (`0.0.0.0/0`) 访问 **NodePort 范围（默认是 `30000-32768`）** 的规则。
+    *   **添加**一条新的入站规则：
+        *   **类型：** 自定义 TCP
+        *   **端口范围：** `30000-32768` (或者您的 Airflow Service 映射到的特定 NodePort)
+        *   **源：** 设置为 **ALB 的安全组 (Source Group)**。这是最安全的方式。或者，如果ALB是固定IP，也可以设置为ALB的IP/CIDR。
+
+
+
+**这样配置的效果是：** 即使请求通过了第一道ALB的IP检查，到达了Worker Node，它还必须通过第二道安全组的检查。只有来自ALB的流量才被允许访问接收流量的NodePort，从而实现了深度防御。
+
+### 总结对比：`ip` vs `instance` 模式下的源限制
+
+| 配置层面 | `target-type: ip` (Pod IP) | `target-type: instance` (NodePort) |
+| :--- | :--- | :--- |
+| **入口屏障** | **必需**。通过 `ingress` annotation (`inbound-cidrs`) 在 ALB 实现。 | **必需**。通过 `ingress` annotation (`inbound-cidrs`) 在 ALB 实现。 |
+| **后端屏障** | **自动**。由 ALB Controller 通过安全组规则自动确保只有ALB能访问Pod。 | **手动必需**。**您必须手动配置** Worker Node 的安全组，只允许ALB访问NodePort范围。 |
+
+**结论：**
+对于 `instance` 模式，您必须采取**组合拳**：
+1.  **在 Ingress 上配置 `alb.ingress.kubernetes.io/inbound-cidrs`** 以限制最终用户源IP。
+2.  **手动修改 Worker Node 的安全组**，限制只有 ALB 本身可以作为源来访问节点的端口。
+
+这种双重配置确保了从互联网用户到ALB，再到您的EC2实例的整条链路都是安全且受限制的。
+
+
+您说得完全正确。在生产环境中，**绝对不能**使用 `0.0.0.0/0` 作为安全组或 ALB 源IP规则的允许条目。这是一个巨大的安全风险。
+
+以下是针对 **Airflow on EKS (Helm + ALB)** 的安全配置，完全摒弃 `0.0.0.0/0`。
+
+### 核心安全原则：最小权限原则
+
+只允许**绝对必要**的源地址访问**绝对必要**的端口。
+
+---
+
+### 配置方案（无 `0.0.0.0/0`）
+
+我们需要在两个层面进行严格限制：
+
+#### 1. ALB / Ingress 层面 - 限制最终用户访问
+
+这是第一道，也是最重要的防线，直接限制哪些IP可以访问您的Airflow网站。
+
+**在 `values.yaml` 的 `ingress` 部分配置：**
+
+```yaml
+ingress:
+  enabled: true
+  className: alb
+  annotations:
+    # 核心安全配置：只允许来自公司网络和VPN的流量
+    alb.ingress.kubernetes.io/inbound-cidrs: 192.168.1.0/24, 203.0.113.10/32, 198.51.100.0/28
+    # 格式：办公室IP段, 特定公网IP, VPN用户IP段
+
+    kubernetes.io/ingress.class: alb
+    alb.ingress.kubernetes.io/scheme: internal # 强烈建议：如果用户通过VPN访问，设为internal更安全
+    alb.ingress.kubernetes.io/target-type: ip # 首选ip模式，更安全且无需管理NodePort
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTPS": 443}]'
+    alb.ingress.kubernetes.io/certificate-arn: arn:aws:acm:...
+  hosts:
+    - host: airflow.internal.your-company.com
+      paths:
+        - path: /
+          pathType: Prefix
+```
+
+**关键点：**
+*   `alb.ingress.kubernetes.io/inbound-cidrs`: 这里列出所有被授权的用户IP地址段。这是拒绝互联网上任意用户访问的关键。
+*   `alb.ingress.kubernetes.io/scheme: internal`: 如果您的用户都通过VPN或Direct Connect访问，创建一个**内网ALB**是最安全的选择，它根本不会暴露在公网上。
+
+#### 2. EKS Worker Node 安全组层面 - 限制谁可以访问后端
+
+这是第二道防线，确保即使有人绕过了ALB，也无法直接攻击您的节点。
+
+**目标：** 只允许必要的流量到达Worker Node。
+**需要配置的规则：**
+
+*   **从ALB到Worker Node:**
+    *   **协议/端口：** TCP / NodePort 范围 (e.g., `30000-32768`) **或** 精确的 Airflow Service NodePort。
+    *   **源：** **ALB 的安全组ID** (例如 `sg-0aabc1234567890bc`)。这是最佳实践。
+
+*   **管理流量 (SSH, etc.):**
+    *   **协议/端口：** TCP / 22 (SSH)
+    *   **源：** 您的**运维跳板机**或**堡垒主机**的IP地址，或者管理网络的CIDR块。
+
+*   **节点间通信 (k8s overlay网络):**
+    *   **协议/端口：** 所有协议 / 所有端口 或 特定k8s端口
+    *   **源：** **self** (即安全组自身ID)。允许同安全组内的实例互相通信。
+
+*   **从Control Plane到Worker:**
+    *   EKS 会自动创建规则允许控制平面与节点通信。请不要修改EKS管理的规则。
+
+**错误的配置：**
+*   在安全组入站规则中，允许 `0.0.0.0/0` 访问任何端口（尤其是22, 80, 443, 8080, 30000-32768）。
+
+**正确的配置示例（AWS 安全组入站规则视图）：**
+
+| 类型 | 协议 | 端口范围 | 源 | 描述 |
+| :--- | :--- | :--- | :--- | :--- |
+| SSH | TCP | 22 | 192.168.1.50/32 | 允许来自堡垒主机的SSH |
+| 自定义 TCP | TCP | 30000-32768 | sg-0aabc1234567890bc | 允许来自ALB的流量访问NodePort |
+| 所有流量 | 全部 | 全部 | sg-xxxxxxxxx | 允许节点间通信（源为当前安全组ID） |
+
+### 操作建议
+
+1.  **首选 `target-type: ip` 模式**：Helm Chart 默认通常为此模式。这样ALB会直接与Pod通信，您就**无需手动管理NodePort安全组规则**，安全性由EKS和ALB Controller自动维护。这是更现代、更安全的选择。
+2.  **彻底审计安全组**：检查您的EKS集群创建时自动生成的的安全组（通常名称包含 `ClusterSharedNodeSecurityGroup` 和 `ControlPlaneSecurityGroup`），确保没有任何规则包含 `0.0.0.0/0`（除了*可能*的一个出站规则，出站规则通常允许所有出站流量是正常的）。
+3.  **使用内部ALB**：如果业务场景允许，将ALB设置为 `internal`，这是最有效的安全措施。
+
+通过结合 **ALB层面的源IP过滤** 和 **Worker Node安全组的严格规则**，您可以构建一个没有任何 `0.0.0.0/0` 规则的、坚固的Airflow部署环境。
+
 
 
 
