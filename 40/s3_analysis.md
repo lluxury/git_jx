@@ -181,3 +181,117 @@ print(f"95分位: {quantiles[0.95]}")
 •   JSON文件格式需留意：无论是Athena还是Python，处理前都需确认JSON文件的格式。例如，Athena期望每行一个完整的JSON记录；若单个文件内是包含多个对象的数组，Python的json.load()可直接解析为列表，而Athena可能需要特殊处理。
 
 希望这些具体的方案能帮助你有效地分析S3上JSON文件的长度分布。如果你能分享关于数据规模（如文件数量和总大小）以及JSON结构（如每文件是对象数组还是单行JSON）的更多信息，我可以提供更具体的建议。
+
+
+
+
+
+
+
+
+
+
+
+处理嵌套JSON数据的关键在于选择合适的工具和方法将其“扁平化”，以便进行分析。AWS Athena和Python（Pandas）是两种最常用的方案，它们的特点对比如下：
+
+特性 AWS Athena Python (Pandas)
+
+核心逻辑 使用SQL定义嵌套结构，查询时用UNNEST展开 将JSON加载为Python数据结构，用json_normalize展平
+
+优势 适合处理S3中海量数据，无需移动数据 分析过程灵活可控，可进行复杂的数据处理和自定义分析
+
+数据量 海量数据（TB/PB级） 受限于本地内存和计算资源
+
+🛠️ 使用 AWS Athena 处理
+
+在Athena中，你需要通过创建表来定义嵌套结构，并在查询时解开嵌套的数组。
+
+1.  定义表结构映射嵌套JSON
+    使用CREATE EXTERNAL TABLE语句，通过STRUCT定义嵌套对象，通过ARRAY定义数组。假设你的JSON数据如下所示，其中 items 是一个包含多个对象的数组：
+    {
+      "orderId": "A123456",
+      "customer": {"id": "C7890", "name": "王小明", "region": "华东"},
+      "items": [
+        {"productId": "P001", "category": "饮料", "price": 10, "quantity": 2},
+        {"productId": "P002", "category": "零食", "price": 15, "quantity": 1}
+      ]
+    }
+    
+    对应的建表语句如下。注意，每个JSON记录在S3中必须是单行文本。
+    CREATE EXTERNAL TABLE orders (
+      orderid string,
+      customer struct<id:string, name:string, region:string>,
+      items array<struct<productid:string, category:string, price:double, quantity:int>>
+    )
+    ROW FORMAT SERDE 'org.openx.data.jsonserde.JsonSerDe'
+    LOCATION 's3://your-bucket/your-data-path/';
+    
+    
+
+2.  查询时使用 UNNEST 展开数组
+    表创建成功后，使用CROSS JOIN UNNEST将items数组中的每个元素展开为单独的行。这样，你就可以像查询普通表格一样进行分析了。
+    SELECT 
+      orderid, 
+      customer.name as customer_name,
+      item.productid,
+      item.category,
+      item.price * item.quantity as subtotal
+    FROM orders
+    CROSS JOIN UNNEST(items) AS t (item)
+    
+    这个查询会为每个订单中的每个商品生成一条记录，从而可以轻松地按商品类别（item.category）进行聚合统计。
+
+🐍 使用 Python (Pandas) 处理
+
+在Python中，你可以逐行读取S3上的JSON文件，并使用Pandas库将其展平。
+
+1.  读取S3上的JSON文件并解析
+    使用boto3读取S3文件，用json.loads解析，然后用pd.json_normalize()进行展平。json_normalize是处理嵌套JSON的核心函数。
+    import pandas as pd
+    import json
+    import boto3
+
+    s3 = boto3.client('s3')
+    bucket_name = 'your-bucket'
+    key = 'your-data-path/your-file.json'
+
+    # 从S3获取JSON文件内容
+    response = s3.get_object(Bucket=bucket_name, Key=key)
+    json_content = json.loads(response['Body'].read().decode('utf-8'))
+    
+    # 使用 json_normalize 展平数据，record_path 指定要展开的数组
+    df = pd.json_normalize(json_content, 
+                          record_path='items',          # 指定要展开的嵌套数组字段
+                          meta=['orderId',             # 指定要保留的元字段
+                                ['customer', 'name'], 
+                                ['customer', 'region']],
+                          errors='ignore')
+    print(df.head())
+    
+    执行后，df会变成一个平坦的DataFrame，每一行代表一个商品项，并关联了订单和客户信息。
+
+2.  进行长度分布分析
+    数据展平后，你就可以轻松地进行各种分析了。例如，要分析每个JSON文件（即每个订单）的商品数量（即items数组的长度）分布：
+    # 假设你有一个包含多个订单JSON对象的列表
+    all_orders = [order1, order2, ...] 
+    
+    # 计算每个订单的商品数量
+    order_item_counts = [len(order['items']) for order in all_orders if 'items' in order]
+    
+    # 转换为Series计算分位数
+    counts_series = pd.Series(order_item_counts)
+    quantiles = counts_series.quantile([0.5, 0.9, 0.95])
+    print(f"50分位 (中位数): {quantiles[0.5]}")
+    print(f"90分位: {quantiles[0.9]}")
+    print(f"95分位: {quantiles[0.95]}")
+    
+
+💡 重要注意事项
+
+•   JSON格式：Athena要求每个JSON记录必须是单行文本。如果你的JSON是美化打印（多行缩进）格式，查询会失败。需要先将其转换为单行格式。
+
+•   字段名规范：Athena默认对列名不区分大小写。如果JSON键名包含点（.）或存在大小写冲突，需要在建表时通过WITH SERDEPROPERTIES进行映射。
+
+•   分析维度选择：在拆解嵌套JSON时，应从业务需求出发，优先选择核心分析维度，避免过度展开不重要的嵌套字段，以提高分析效率。
+
+希望这些具体的方案能帮助你顺利处理嵌套JSON数据。如果你能分享一两条具体的嵌套JSON样例，我可以提供更贴合你数据结构的建表语句或解析代码。
